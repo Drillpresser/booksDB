@@ -1,0 +1,24 @@
+{
+  "name": "booksdb",
+  "version": "1.0.0",
+  "main": "firebase-config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Drillpresser/booksDB.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Drillpresser/booksDB/issues"
+  },
+  "homepage": "https://github.com/Drillpresser/booksDB#readme",
+  "description": "",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "firebase": "^11.3.1"
+  }
+}

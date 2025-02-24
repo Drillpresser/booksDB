@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#ffffff">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <link rel="stylesheet" href="search.css">
+    <link rel="stylesheet" href="auth-modal.css">
+    <title>BooksDB</title>
+</head>
+<body>
+  <h1>Open Library Book Search</h1>
+  <div class="search-box">
+    <input type="text" id="search-input" placeholder="Enter search term..." />
+    <button id="search-button">Search</button>
+  </div>
+  <div id="results-container"></div>
+  <script src="search.js"></script>
+
+  <!-- Button to open the modal -->
+  <button id="auth-modal-btn">Login / Sign Up</button>
+
+  <script src="auth-modal.js"></script>
+
+</body>
+</html>
