@@ -42,3 +42,24 @@
     text-decoration: none;
     cursor: pointer;
   }
+
+  /* The tab header */
+.modal-tabs {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    background-color: #2D4100;
+  }
+
+  .auth-tab {
+    flex: 1;
+    padding: 15px;
+    margin: 5px;
+    background-color: #DDAE06;
+    color: #7F5228;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+    font-size: 16px;
+  }
