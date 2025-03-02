@@ -8,15 +8,19 @@
     <link rel="icon" href="/icons/icon-192x192.png">
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <link rel="stylesheet" href="search.css">
-    <link rel="stylesheet" href="auth-modal.css">
+    <link rel="stylesheet" href="auth-modal/auth-modal.css">
     <link rel="stylesheet" href="stylesheet.css">
     <title>BooksDB</title>
 </head>
 <body>
   <div id="top-bar">
-    <button class="style-one-btn" id="auth-modal-btn">Sign Up</button>
-    <script src="auth-modal.js"></script>
+    <button id="auth-modal-btn" class="style-one-btn">Sign Up</button>
   </div>
+
+  <div id="auth-modal-container"></div>
+  <script src="auth-modal/auth-modal.js"></script>
+
+
   <h1>Open Library Book Search</h1>
   <div class="search-box">
     <input type="text" id="search-input" placeholder="Enter search term..." />
