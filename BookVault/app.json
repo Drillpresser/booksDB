@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "BookVault",
+    "slug": "bookvault",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "bookvault",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#2C5F8A"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.bookvault.app"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "BookVault uses your camera to scan book barcodes."
+        }
+      ]
+    ]
+  }
+}
