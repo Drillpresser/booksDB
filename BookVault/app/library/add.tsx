@@ -227,6 +227,9 @@ export default function AddBookScreen() {
             <Ionicons name="pencil-outline" size={22} color="#fff" style={{ marginRight: spacing.sm }} />
             <Text style={styles.btnText}>Enter Manually</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.cancelLink} onPress={() => router.back()}>
+            <Text style={styles.cancelLinkText}>Cancel</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -239,6 +242,10 @@ export default function AddBookScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.form}>
+        <TouchableOpacity style={styles.backRow} onPress={() => setMode('choose')}>
+          <Ionicons name="chevron-back" size={18} color={colors.primary} />
+          <Text style={styles.backRowText}>Choose different method</Text>
+        </TouchableOpacity>
         <View style={styles.isbnRow}>
           <TextInput
             style={[styles.input, { flex: 1 }]}
@@ -284,6 +291,9 @@ export default function AddBookScreen() {
 
         <TouchableOpacity style={[styles.btn, { marginTop: spacing.lg }]} onPress={handleSave} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Save Book</Text>}
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.cancelLink} onPress={() => router.back()}>
+          <Text style={styles.cancelLinkText}>Cancel — don't save</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -362,6 +372,10 @@ const styles = StyleSheet.create({
   btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   btnOutline: { borderWidth: 2, borderColor: colors.primary, borderRadius: radius.md, padding: spacing.md, minWidth: 160, alignItems: 'center' },
   btnOutlineText: { color: colors.primary, fontSize: 16, fontWeight: '700' },
+  cancelLink: { alignItems: 'center', paddingVertical: spacing.md },
+  cancelLinkText: { color: colors.textSecondary, fontSize: 15 },
+  backRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, gap: spacing.xs },
+  backRowText: { color: colors.primary, fontSize: 14 },
   scanOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center', padding: spacing.xl, gap: spacing.md, backgroundColor: 'rgba(0,0,0,0.5)' },
   scanFrame: { position: 'absolute', top: '30%', alignSelf: 'center', width: 260, height: 120, borderWidth: 2, borderColor: '#fff', borderRadius: radius.md },
   scanHint: { color: '#fff', fontSize: 14, textAlign: 'center' },

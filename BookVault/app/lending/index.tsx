@@ -3,8 +3,8 @@ import {
   View, Text, FlatList, TouchableOpacity, Image, StyleSheet,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { DrawerToggleButton } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
+import { MenuButton } from '../../src/components/MenuButton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
 import { getActiveLoans, returnLoan } from '../../src/database/queries/loans';
@@ -85,7 +85,7 @@ export default function LendingScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <DrawerToggleButton tintColor="#fff" />
+        <MenuButton />
         <Text style={styles.headerTitle}>Lending</Text>
       </View>
 

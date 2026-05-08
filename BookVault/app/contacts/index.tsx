@@ -4,8 +4,8 @@ import {
   Alert, TextInput, Modal,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { DrawerToggleButton } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
+import { MenuButton } from '../../src/components/MenuButton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
 import { getAllContacts, createContact, getActiveLoansCountForContact } from '../../src/database/queries/contacts';
@@ -41,7 +41,7 @@ export default function ContactsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <DrawerToggleButton tintColor="#fff" />
+        <MenuButton />
         <Text style={styles.headerTitle}>Contacts</Text>
         <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.addButton}>
           <Ionicons name="add" size={28} color="#fff" />
