@@ -4,13 +4,8 @@
     "slug": "bookvault",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
     "scheme": "bookvault",
     "userInterfaceStyle": "light",
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#2C5F8A"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.bookvault.app"
