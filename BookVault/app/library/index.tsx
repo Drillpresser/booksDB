@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { MenuButton } from '../../src/components/MenuButton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
 import { getAllCopies, searchCopies } from '../../src/database/queries/books';
@@ -176,7 +175,6 @@ export default function LibraryScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <MenuButton />
         <Text style={styles.headerTitle}>Library</Text>
         <TouchableOpacity onPress={() => router.push('/library/add')} style={styles.addButton}>
           <Ionicons name="add" size={28} color="#fff" />

@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { MenuButton } from '../../src/components/MenuButton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
 import { getApiKey, saveApiKey, deleteApiKey } from '../../src/services/claude';
@@ -53,7 +52,6 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <MenuButton />
         <Text style={styles.headerTitle}>Settings</Text>
       </View>
 
