@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Image, useWindowDimensions,
+  ScrollView, StyleSheet, Image,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -199,7 +199,7 @@ export default function LibraryScreen() {
       </View>
 
       {!isSearching && (
-        <View style={styles.sortBar}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sortBar} contentContainerStyle={styles.sortBarContent}>
           {(['classification', 'author', 'title', 'dateAdded'] as SortMode[]).map((mode) => (
             <TouchableOpacity
               key={mode}
@@ -211,7 +211,7 @@ export default function LibraryScreen() {
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       )}
 
       {!isSearching && renderBreadcrumb()}
@@ -278,7 +278,8 @@ const styles = StyleSheet.create({
   addButton: { padding: spacing.sm },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, margin: spacing.md, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.border },
   searchInput: { flex: 1, fontSize: 16, color: colors.text },
-  sortBar: { flexDirection: 'row', paddingHorizontal: spacing.md, marginBottom: spacing.sm, gap: spacing.sm },
+  sortBar: { marginBottom: spacing.sm },
+  sortBarContent: { flexDirection: 'row', paddingHorizontal: spacing.md, gap: spacing.sm },
   sortChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   sortChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   sortChipText: { fontSize: 13, color: colors.textSecondary },
