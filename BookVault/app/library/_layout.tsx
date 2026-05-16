@@ -5,15 +5,15 @@ export default function LibraryLayout() {
   return (
     <Stack
       screenOptions={{
+        headerShown: false,
         headerStyle: { backgroundColor: colors.primary },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: '700' },
         headerBackTitle: 'Back',
       }}
     >
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="add" options={{ title: 'Add Book', presentation: 'modal' }} />
-      <Stack.Screen name="[copyId]" options={{ title: 'Book Detail' }} />
+      <Stack.Screen name="add" options={{ headerShown: true, title: 'Add Book', presentation: 'modal' }} />
+      <Stack.Screen name="[copyId]" options={{ headerShown: true, title: 'Book Detail' }} />
     </Stack>
   );
 }
