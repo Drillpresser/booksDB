@@ -4,8 +4,8 @@ import * as SecureStore from 'expo-secure-store';
 
 // After creating your project at supabase.com, paste the values from
 // Project Settings → API into the two constants below.
-export const SUPABASE_URL = 'https://YOUR_PROJECT_REF.supabase.co';
-export const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+export const SUPABASE_URL = 'https://xukrezkcuufoqkiwnkkj.supabase.co';
+export const SUPABASE_ANON_KEY = 'sb_publishable_gP8CV1N_XYBLYC2RzHYGug_XL1hc0RN';
 
 const SecureStoreAdapter = {
   getItem: (key: string) => SecureStore.getItemAsync(key),
