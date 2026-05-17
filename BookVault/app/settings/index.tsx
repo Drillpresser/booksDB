@@ -8,9 +8,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
 import { getApiKey, saveApiKey, deleteApiKey } from '../../src/services/claude';
+import { useAuth } from '../../src/contexts/AuthContext';
+import { AuthSheet } from '../../src/components/AuthSheet';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { user, signOut } = useAuth();
+  const [authVisible, setAuthVisible] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [hasKey, setHasKey] = useState(false);
   const [showKey, setShowKey] = useState(false);
@@ -119,11 +123,39 @@ export default function SettingsScreen() {
         <View style={styles.divider} />
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <Text style={styles.sectionDesc}>
+            Sign in to rate books and see community ratings from other readers.
+          </Text>
+          {user ? (
+            <View style={styles.accountRow}>
+              <View style={styles.accountAvatar}>
+                <Text style={styles.accountAvatarText}>{(user.email ?? 'U').charAt(0).toUpperCase()}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.accountEmail}>{user.email ?? 'Signed in'}</Text>
+              </View>
+              <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
+                <Text style={styles.signOutBtnText}>Sign Out</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.signInBtn} onPress={() => setAuthVisible(true)}>
+              <Text style={styles.signInBtnText}>Sign In</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.divider} />
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
           <Text style={styles.sectionDesc}>BookVault — Personal Library Catalog</Text>
           <Text style={styles.hint}>Version 1.0.0</Text>
         </View>
       </ScrollView>
+
+      <AuthSheet visible={authVisible} onClose={() => setAuthVisible(false)} />
     </SafeAreaView>
   );
 }
@@ -147,6 +179,14 @@ const styles = StyleSheet.create({
   removeBtn: { borderWidth: 1, borderColor: colors.danger, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg },
   removeBtnText: { color: colors.danger, fontWeight: '700' },
   hint: { fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
+  accountRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
+  accountAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
+  accountAvatarText: { color: colors.primary, fontWeight: '700', fontSize: 18 },
+  accountEmail: { fontSize: 14, color: colors.text },
+  signOutBtn: { borderWidth: 1, borderColor: colors.danger, borderRadius: radius.md, paddingVertical: spacing.xs, paddingHorizontal: spacing.md },
+  signOutBtnText: { color: colors.danger, fontWeight: '600', fontSize: 14 },
+  signInBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, alignSelf: 'flex-start' },
+  signInBtnText: { color: '#fff', fontWeight: '700' },
   divider: { height: 1, backgroundColor: colors.border },
   navRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
   navRowText: { flex: 1, fontSize: 16, color: colors.text },

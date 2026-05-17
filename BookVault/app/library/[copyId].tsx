@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
+import { CommunityRatings } from '../../src/components/CommunityRatings';
 import { getCopyById, updateBookCopy, deleteBookCopy } from '../../src/database/queries/books';
 import { getLoanHistoryForCopy, createLoan, returnLoan } from '../../src/database/queries/loans';
 import { getAllContacts, createContact } from '../../src/database/queries/contacts';
@@ -192,13 +193,13 @@ export default function BookDetailScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          {book.record.communityRating && (
-            <Text style={styles.communityRating}>
-              Community: {book.record.communityRating.toFixed(1)} ★
-              {book.record.communityRatingCount ? ` (${book.record.communityRatingCount.toLocaleString()} ratings)` : ''}
-            </Text>
-          )}
         </View>
+
+        {book.record.isbn ? (
+          <View style={styles.section}>
+            <CommunityRatings isbn={book.record.isbn} />
+          </View>
+        ) : null}
 
         {book.record.synopsis && (
           <View style={styles.section}>

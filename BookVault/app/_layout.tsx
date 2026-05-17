@@ -1,9 +1,11 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../src/theme';
+import { AuthProvider } from '../src/contexts/AuthContext';
 
 export default function RootLayout() {
   return (
+    <AuthProvider>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -45,5 +47,6 @@ export default function RootLayout() {
         }}
       />
     </Tabs>
+    </AuthProvider>
   );
 }
