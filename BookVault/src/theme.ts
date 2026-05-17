@@ -1,17 +1,17 @@
 export const colors = {
-  primary: '#2C5F8A',
-  primaryLight: '#E8F4F8',
-  accent: '#F5A623',
-  danger: '#E53935',
-  warning: '#FF8F00',
-  success: '#43A047',
-  background: '#F5F5F5',
-  surface: '#FFFFFF',
-  text: '#1A1A1A',
-  textSecondary: '#666666',
-  border: '#E0E0E0',
-  onLoan: '#F5A623',
-  overdue: '#E53935',
+  primary: '#8B5BAD',        // amethyst purple
+  primaryLight: '#3A2650',   // dark amethyst tint for chips/badges
+  accent: '#C4913A',         // warm amber/gold
+  danger: '#B85450',         // muted crimson
+  warning: '#C4803A',        // burnt amber
+  success: '#5E8A5B',        // forest green
+  background: '#16101F',     // deep midnight
+  surface: '#231730',        // rich dark plum
+  text: '#F0E6D3',           // parchment cream
+  textSecondary: '#A890BC',  // dusty lavender
+  border: '#3D2B52',         // dark purple border
+  onLoan: '#C4913A',         // amber — matches accent
+  overdue: '#B85450',
 };
 
 export const spacing = {
