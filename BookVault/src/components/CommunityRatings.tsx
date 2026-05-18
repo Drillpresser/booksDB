@@ -113,7 +113,7 @@ export function CommunityRatings({ isbn, localRating, onLocalRating }: Props) {
                   <Ionicons
                     name={s <= displayedStars ? 'star' : 'star-outline'}
                     size={28}
-                    color={s <= displayedStars ? colors.accent : colors.border}
+                    color={s <= displayedStars ? colors.stars : colors.border}
                   />
                 </TouchableOpacity>
               ))}
@@ -169,7 +169,7 @@ export function CommunityRatings({ isbn, localRating, onLocalRating }: Props) {
                   <Ionicons
                     name={s <= pendingStar ? 'star' : 'star-outline'}
                     size={40}
-                    color={s <= pendingStar ? colors.accent : colors.border}
+                    color={s <= pendingStar ? colors.stars : colors.border}
                   />
                 </TouchableOpacity>
               ))}
@@ -206,7 +206,7 @@ function StarDisplay({ rating, size }: { rating: number; size: number }) {
           key={s}
           name={s <= Math.round(rating) ? 'star' : 'star-outline'}
           size={size}
-          color={colors.accent}
+          color={colors.stars}
         />
       ))}
     </View>

@@ -197,7 +197,7 @@ export default function BookDetailScreen() {
                   <Ionicons
                     name={star <= (book.personalRating ?? 0) ? 'star' : 'star-outline'}
                     size={32}
-                    color={star <= (book.personalRating ?? 0) ? colors.accent : colors.border}
+                    color={star <= (book.personalRating ?? 0) ? colors.stars : colors.border}
                   />
                 </TouchableOpacity>
               ))}

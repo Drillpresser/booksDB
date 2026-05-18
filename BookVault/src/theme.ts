@@ -1,17 +1,34 @@
+// Green Orange Harmony palette
+// Tom Thumb #2d4a2b · Chalet Green #4c703e · Sushi #85af3c
+// Sandy Brown #f1a350 · Jaffa #e77d36
+
 export const colors = {
-  primary: '#355E3B',        // hunter green
-  primaryLight: '#1E3B22',   // dark green tint for chips/badges
-  accent: '#C9A84C',         // burnished brass
-  danger: '#B85450',         // muted crimson
-  warning: '#C4803A',        // burnt amber
-  success: '#5E8A5B',        // forest green
-  background: '#0F1A10',     // deep forest black
-  surface: '#1A2E1C',        // dark green surface
-  text: '#F0EBE0',           // warm parchment
-  textSecondary: '#8A9E8C',  // muted sage
-  border: '#2A4030',         // dark green border
-  onLoan: '#C9A84C',         // brass — matches accent
-  overdue: '#B85450',
+  primary: '#E77D36',        // jaffa — buttons, headers, active states
+  primaryLight: '#FDE8D0',   // pale apricot — chip/badge backgrounds, avatars
+  primaryDark: '#C5612A',    // deep jaffa — pressed states, emphasis
+
+  accent: '#85AF3C',         // sushi green — secondary badges, tags
+  accentDark: '#4C703E',     // chalet green — active accent, icons
+
+  stars: '#F5C518',          // standard gold for ratings
+
+  danger: '#B04040',         // muted red
+  warning: '#F1A350',        // sandy brown
+  success: '#4C703E',        // chalet green
+
+  background: '#FAF3E0',     // cream parchment
+  surface: '#F0E6C8',        // deeper parchment — cards, inputs
+  surfaceAlt: '#E8D9B5',     // richest parchment — nested elements, dividers
+
+  text: '#2D4A2B',           // tom thumb — primary text
+  textSecondary: '#4C703E',  // chalet green — secondary text, labels
+  textMuted: '#7A8C6E',      // muted sage — hints, placeholders
+
+  border: '#D4C09A',         // warm tan
+  borderDark: '#B8A07A',     // deeper tan — emphasis borders
+
+  onLoan: '#E77D36',         // jaffa
+  overdue: '#B04040',        // muted red
 };
 
 export const spacing = {
