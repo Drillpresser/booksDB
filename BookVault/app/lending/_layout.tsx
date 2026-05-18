@@ -2,11 +2,12 @@ import { Stack } from 'expo-router';
 import { colors } from '../../src/theme';
 
 const headerOptions = {
-  headerStyle: { backgroundColor: colors.background },
+  headerStyle: { backgroundColor: '#8B3500' },
   headerTintColor: '#DAA520',
-  headerTitleStyle: { fontWeight: '700' as const, color: colors.text },
+  headerTitleStyle: { fontWeight: '700' as const, color: '#FFFFFF' },
   headerTitleAlign: 'center' as const,
   headerShadowVisible: true,
+  headerBackTitle: '',
 };
 
 export default function LendingLayout() {
