@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Modal,
-  ActivityIndicator, Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,19 +11,13 @@ import { useAuth } from '../contexts/AuthContext';
 type Props = { visible: boolean; onClose: () => void };
 
 export function AuthSheet({ visible, onClose }: Props) {
-  const { signInWithGoogle, signInWithApple } = useAuth();
-  const [busy, setBusy] = useState<'google' | 'apple' | null>(null);
+  const { signInWithGoogle } = useAuth();
+  const [busy, setBusy] = useState(false);
 
   async function handleGoogle() {
-    setBusy('google');
+    setBusy(true);
     try { await signInWithGoogle(); onClose(); }
-    finally { setBusy(null); }
-  }
-
-  async function handleApple() {
-    setBusy('apple');
-    try { await signInWithApple(); onClose(); }
-    finally { setBusy(null); }
+    finally { setBusy(false); }
   }
 
   return (
@@ -42,19 +36,11 @@ export function AuthSheet({ visible, onClose }: Props) {
             Sign in to rate books and see what other readers think.
           </Text>
 
-          <TouchableOpacity style={[styles.btn, styles.googleBtn]} onPress={handleGoogle} disabled={!!busy}>
-            {busy === 'google'
+          <TouchableOpacity style={[styles.btn, styles.googleBtn]} onPress={handleGoogle} disabled={busy}>
+            {busy
               ? <ActivityIndicator color="#fff" />
               : <><Ionicons name="logo-google" size={20} color="#fff" /><Text style={styles.btnText}>Continue with Google</Text></>}
           </TouchableOpacity>
-
-          {Platform.OS === 'ios' && (
-            <TouchableOpacity style={[styles.btn, styles.appleBtn]} onPress={handleApple} disabled={!!busy}>
-              {busy === 'apple'
-                ? <ActivityIndicator color="#fff" />
-                : <><Ionicons name="logo-apple" size={20} color="#fff" /><Text style={styles.btnText}>Continue with Apple</Text></>}
-            </TouchableOpacity>
-          )}
         </View>
       </SafeAreaView>
     </Modal>
@@ -70,6 +56,5 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
   btn: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, width: '100%', padding: spacing.md, borderRadius: radius.md, justifyContent: 'center', minHeight: 52 },
   googleBtn: { backgroundColor: '#4285F4' },
-  appleBtn: { backgroundColor: '#1C1C1E' },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });
