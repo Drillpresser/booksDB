@@ -54,11 +54,7 @@ export default function SettingsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
-      </View>
-
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Claude AI</Text>
@@ -162,8 +158,6 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, paddingHorizontal: spacing.sm, paddingBottom: spacing.sm },
-  headerTitle: { flex: 1, color: '#fff', fontSize: 20, fontWeight: '700', marginLeft: spacing.xs },
   scroll: { padding: spacing.md, gap: spacing.md },
   section: { gap: spacing.md },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.text },

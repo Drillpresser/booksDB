@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   ScrollView, StyleSheet, Image,
 } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
@@ -173,13 +173,15 @@ export default function LibraryScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Library</Text>
-        <TouchableOpacity onPress={() => router.push('/library/add')} style={styles.addButton}>
-          <Ionicons name="add" size={28} color="#fff" />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <Stack.Screen options={{
+        title: 'Library',
+        headerRight: () => (
+          <TouchableOpacity onPress={() => router.push('/library/add')} style={{ paddingRight: spacing.xs }}>
+            <Ionicons name="add" size={28} color={colors.text} />
+          </TouchableOpacity>
+        ),
+      }} />
 
       <View style={styles.searchBar}>
         <Ionicons name="search" size={18} color={colors.textSecondary} style={{ marginRight: spacing.sm }} />
@@ -273,9 +275,6 @@ function BookRow({ book, onPress }: { book: BookCopyWithDetails; onPress: () => 
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, paddingHorizontal: spacing.sm, paddingBottom: spacing.sm },
-  headerTitle: { flex: 1, color: '#fff', fontSize: 20, fontWeight: '700', marginLeft: spacing.xs },
-  addButton: { padding: spacing.sm },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, margin: spacing.md, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.border },
   searchInput: { flex: 1, fontSize: 16, color: colors.text },
   sortBar: { marginBottom: spacing.sm, maxHeight: 40 },
