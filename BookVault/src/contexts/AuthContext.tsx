@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 import { Session, User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '../lib/supabase';
 
@@ -35,7 +36,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function signInWithGoogle() {
-    const redirectUri = makeRedirectUri({ scheme: 'bookvault', path: 'auth/callback' });
+    const redirectUri = __DEV__
+      ? Linking.createURL('auth/callback')
+      : makeRedirectUri({ scheme: 'bookvault', path: 'auth/callback' });
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
