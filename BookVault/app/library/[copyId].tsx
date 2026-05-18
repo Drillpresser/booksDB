@@ -195,9 +195,9 @@ export default function BookDetailScreen() {
           </View>
         </View>
 
-        {book.record.isbn ? (
+        {book.record.isbn13 ? (
           <View style={styles.section}>
-            <CommunityRatings isbn={book.record.isbn} />
+            <CommunityRatings isbn={book.record.isbn13} />
           </View>
         ) : null}
 
