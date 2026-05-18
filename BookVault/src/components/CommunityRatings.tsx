@@ -10,9 +10,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { AuthSheet } from './AuthSheet';
 import { getRatingsForIsbn, upsertRating, deleteRating, RatingSummary } from '../services/ratings';
 
-type Props = { isbn: string };
+type Props = {
+  isbn: string;
+  localRating: number | null;
+  onLocalRating: (star: number) => void;
+};
 
-export function CommunityRatings({ isbn }: Props) {
+export function CommunityRatings({ isbn, localRating, onLocalRating }: Props) {
   const { user } = useAuth();
   const [summary, setSummary] = useState<RatingSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,7 +46,11 @@ export function CommunityRatings({ isbn }: Props) {
   }
 
   function handleStarPress(star: number) {
-    if (!user) { setAuthVisible(true); return; }
+    if (!user) {
+      // Not signed in — save locally
+      onLocalRating(star);
+      return;
+    }
     setPendingStar(star);
     setReviewModalVisible(true);
   }
@@ -74,7 +82,11 @@ export function CommunityRatings({ isbn }: Props) {
   }
 
   const myRating = summary?.myRating;
-  const displayedStars = myRating?.stars ?? pendingStar;
+  // Signed in: show community rating. Signed out: show local rating.
+  const displayedStars = user ? (myRating?.stars ?? pendingStar) : (localRating ?? 0);
+  const ratingLabel = user
+    ? (myRating ? 'Your rating' : 'Rate this book')
+    : (localRating ? 'Your rating (local)' : 'Rate this book');
 
   return (
     <View style={styles.container}>
@@ -94,7 +106,7 @@ export function CommunityRatings({ isbn }: Props) {
           </View>
 
           <View style={styles.myRatingRow}>
-            <Text style={styles.myRatingLabel}>{myRating ? 'Your rating' : 'Rate this book'}</Text>
+            <Text style={styles.myRatingLabel}>{ratingLabel}</Text>
             <View style={styles.interactiveStars}>
               {[1, 2, 3, 4, 5].map((s) => (
                 <TouchableOpacity key={s} onPress={() => handleStarPress(s)} hitSlop={6}>
@@ -108,7 +120,7 @@ export function CommunityRatings({ isbn }: Props) {
             </View>
             {!user && (
               <TouchableOpacity onPress={() => setAuthVisible(true)}>
-                <Text style={styles.signInLink}>Sign in to rate</Text>
+                <Text style={styles.signInLink}>Sign in to share your rating</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -213,13 +225,13 @@ const styles = StyleSheet.create({
   myRatingRow: { gap: spacing.xs },
   myRatingLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
   interactiveStars: { flexDirection: 'row', gap: spacing.xs },
-  signInLink: { fontSize: 13, color: colors.primary, fontWeight: '600', marginTop: spacing.xs },
+  signInLink: { fontSize: 13, color: colors.accent, fontWeight: '600', marginTop: spacing.xs },
   expandBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs },
   expandBtnText: { fontSize: 14, color: colors.primary, fontWeight: '600' },
   reviewCard: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, gap: spacing.sm },
   reviewHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { color: colors.primary, fontWeight: '700', fontSize: 16 },
+  avatarText: { color: colors.accent, fontWeight: '700', fontSize: 16 },
   reviewMeta: { flex: 1, gap: 2 },
   reviewName: { fontSize: 14, fontWeight: '600', color: colors.text },
   reviewDate: { fontSize: 12, color: colors.textSecondary },

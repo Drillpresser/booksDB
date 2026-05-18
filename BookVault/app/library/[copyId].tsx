@@ -180,26 +180,30 @@ export default function BookDetailScreen() {
           </TouchableOpacity>
         )}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Rating</Text>
-          <View style={styles.starsRow}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity key={star} onPress={() => handleRating(star)}>
-                <Ionicons
-                  name={star <= (book.personalRating ?? 0) ? 'star' : 'star-outline'}
-                  size={32}
-                  color={star <= (book.personalRating ?? 0) ? colors.accent : colors.border}
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
         {book.record.isbn13 ? (
           <View style={styles.section}>
-            <CommunityRatings isbn={book.record.isbn13} />
+            <CommunityRatings
+              isbn={book.record.isbn13}
+              localRating={book.personalRating}
+              onLocalRating={(star) => handleRating(star)}
+            />
           </View>
-        ) : null}
+        ) : (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Your Rating</Text>
+            <View style={styles.starsRow}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => handleRating(star)}>
+                  <Ionicons
+                    name={star <= (book.personalRating ?? 0) ? 'star' : 'star-outline'}
+                    size={32}
+                    color={star <= (book.personalRating ?? 0) ? colors.accent : colors.border}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
 
         {book.record.synopsis && (
           <View style={styles.section}>
