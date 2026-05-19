@@ -14,9 +14,9 @@ const backButton = { headerLeft: ({ canGoBack }: { canGoBack?: boolean }) => <He
 
 export default function SettingsLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false, ...headerOptions }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="classifications" options={{ headerShown: true, title: 'Manage Classifications', ...backButton }} />
+    <Stack screenOptions={{ ...headerOptions }}>
+      <Stack.Screen name="index" options={{ title: 'Settings', ...backButton }} />
+      <Stack.Screen name="classifications" options={{ title: 'Manage Classifications', ...backButton }} />
     </Stack>
   );
 }

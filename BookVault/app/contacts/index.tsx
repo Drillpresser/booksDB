@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   Alert, TextInput, Modal,
 } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
@@ -38,14 +38,12 @@ export default function ContactsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Contacts</Text>
-        <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.addButton}>
+    <SafeAreaView style={styles.container} edges={[]}>
+      <Stack.Screen options={{ headerRight: () => (
+        <TouchableOpacity onPress={() => setModalVisible(true)} style={{ padding: spacing.xs }}>
           <Ionicons name="add" size={28} color="#FFFFFF" />
         </TouchableOpacity>
-      </View>
-
+      )}} />
       <FlatList
         data={contacts}
         keyExtractor={(c) => c.id}
@@ -108,9 +106,6 @@ export default function ContactsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1A0800', paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
-  headerTitle: { flex: 1, color: '#FFFFFF', fontSize: 20, fontWeight: '700', textAlign: 'center' },
-  addButton: { padding: spacing.xs },
   list: { padding: spacing.md, gap: spacing.sm },
   contactRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, gap: spacing.md },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },

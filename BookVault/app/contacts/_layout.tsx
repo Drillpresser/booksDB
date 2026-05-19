@@ -14,9 +14,9 @@ const backButton = { headerLeft: ({ canGoBack }: { canGoBack?: boolean }) => <He
 
 export default function ContactsLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false, ...headerOptions }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="[contactId]" options={{ headerShown: true, title: 'Contact', ...backButton }} />
+    <Stack screenOptions={{ ...headerOptions }}>
+      <Stack.Screen name="index" options={{ title: 'Contacts', ...backButton }} />
+      <Stack.Screen name="[contactId]" options={{ title: 'Contact', ...backButton }} />
     </Stack>
   );
 }
