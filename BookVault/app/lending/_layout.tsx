@@ -1,6 +1,4 @@
 import { Stack } from 'expo-router';
-import { colors } from '../../src/theme';
-import { HeaderBackButton } from '../../src/components/HeaderBackButton';
 
 const headerOptions = {
   headerStyle: { backgroundColor: '#1A0800' },
@@ -9,7 +7,6 @@ const headerOptions = {
   headerTitleAlign: 'center' as const,
   headerShadowVisible: true,
   headerBackTitle: '',
-  headerLeft: ({ canGoBack }: { canGoBack?: boolean }) => <HeaderBackButton canGoBack={canGoBack} />,
 };
 
 export default function LendingLayout() {

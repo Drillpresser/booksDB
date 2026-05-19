@@ -42,9 +42,11 @@ export default function ContactsScreen() {
       <Stack.Screen options={{
         title: 'Contacts',
         headerRight: () => (
-          <TouchableOpacity onPress={() => setModalVisible(true)} style={{ paddingRight: spacing.xs }}>
-            <Ionicons name="add" size={28} color={colors.text} />
-          </TouchableOpacity>
+          <View>
+            <TouchableOpacity onPress={() => setModalVisible(true)} style={{ paddingRight: spacing.xs }}>
+              <Ionicons name="add" size={28} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
         ),
       }} />
 

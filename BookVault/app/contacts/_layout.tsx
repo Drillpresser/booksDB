@@ -1,5 +1,4 @@
 import { Stack } from 'expo-router';
-import { colors } from '../../src/theme';
 import { HeaderBackButton } from '../../src/components/HeaderBackButton';
 
 const headerOptions = {
@@ -9,14 +8,15 @@ const headerOptions = {
   headerTitleAlign: 'center' as const,
   headerShadowVisible: true,
   headerBackTitle: '',
-  headerLeft: ({ canGoBack }: { canGoBack?: boolean }) => <HeaderBackButton canGoBack={canGoBack} />,
 };
+
+const backButton = { headerLeft: ({ canGoBack }: { canGoBack?: boolean }) => <HeaderBackButton canGoBack={canGoBack} /> };
 
 export default function ContactsLayout() {
   return (
     <Stack screenOptions={{ headerShown: true, ...headerOptions }}>
       <Stack.Screen name="index" />
-      <Stack.Screen name="[contactId]" options={{ title: 'Contact' }} />
+      <Stack.Screen name="[contactId]" options={{ title: 'Contact', ...backButton }} />
     </Stack>
   );
 }

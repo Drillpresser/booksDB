@@ -177,9 +177,11 @@ export default function LibraryScreen() {
       <Stack.Screen options={{
         title: 'Library',
         headerRight: () => (
-          <TouchableOpacity onPress={() => router.push('/library/add')} style={{ paddingRight: spacing.xs }}>
-            <Ionicons name="add" size={28} color={colors.text} />
-          </TouchableOpacity>
+          <View>
+            <TouchableOpacity onPress={() => router.push('/library/add')} style={{ paddingRight: spacing.xs }}>
+              <Ionicons name="add" size={28} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
         ),
       }} />
 
