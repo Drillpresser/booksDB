@@ -82,7 +82,11 @@ export default function LendingScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Lending</Text>
+      </View>
+
       <FlatList
         data={[...overdueLoans, ...currentLoans]}
         keyExtractor={(l) => l.id}
@@ -114,6 +118,8 @@ function formatDate(iso: string): string {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  header: { backgroundColor: '#1A0800', paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+  headerTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700', textAlign: 'center' },
   list: { padding: spacing.md, gap: spacing.sm },
   overdueHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: '#FFEBEE', padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.sm },
   overdueHeaderText: { color: colors.danger, fontWeight: '700', fontSize: 14 },

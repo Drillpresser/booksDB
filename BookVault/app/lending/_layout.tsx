@@ -11,8 +11,8 @@ const headerOptions = {
 
 export default function LendingLayout() {
   return (
-    <Stack screenOptions={{ headerShown: true, ...headerOptions }}>
-      <Stack.Screen name="index" options={{ title: 'Lending' }} />
+    <Stack screenOptions={{ headerShown: false, ...headerOptions }}>
+      <Stack.Screen name="index" />
     </Stack>
   );
 }
