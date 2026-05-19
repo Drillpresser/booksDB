@@ -8,7 +8,10 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.bookvault.app"
+      "bundleIdentifier": "com.bookvault.app",
+      "infoPlist": {
+        "UIDesignRequiresCompatibility": true
+      }
     },
     "plugins": [
       "expo-router",
