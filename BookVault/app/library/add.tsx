@@ -1,20 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Alert, Modal, FlatList,
+  StyleSheet, ActivityIndicator, Alert, Modal, FlatList, Image,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
-import { lookupByIsbn, deriveSortAuthor } from '../../src/services/bookLookup';
+import { lookupByIsbn, searchBooks, deriveSortAuthor } from '../../src/services/bookLookup';
 import { lookupBookWithClaude, fillMissingFields, suggestClassification, getApiKey } from '../../src/services/claude';
 import { insertBookRecord, insertBookCopy, saveCoverImage, getRecordByIsbn, getCopyCountForRecord } from '../../src/database/queries/books';
 import { getAllMainClasses, getSectionsByMainClass, getDivisionsBySection } from '../../src/database/queries/classifications';
 import type { BookLookupResult, MainClass, Section, Division } from '../../src/types';
 
-type AddMode = 'choose' | 'scan' | 'manual';
+type AddMode = 'choose' | 'scan' | 'search' | 'manual';
 
 export default function AddBookScreen() {
   const router = useRouter();
@@ -34,10 +34,32 @@ export default function AddBookScreen() {
   const [selectedSection, setSelectedSection] = useState<Section | null>(null);
   const [selectedDivision, setSelectedDivision] = useState<Division | null>(null);
   const [classPickerLevel, setClassPickerLevel] = useState<'main' | 'section' | 'division'>('main');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<BookLookupResult[]>([]);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     setMainClasses(getAllMainClasses());
   }, []);
+
+  async function handleSearch() {
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    setSearchResults([]);
+    try {
+      const results = await searchBooks(searchQuery);
+      setSearchResults(results);
+      if (results.length === 0) Alert.alert('No Results', 'No books found. Try different keywords.');
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function handleSearchResultSelect(result: BookLookupResult) {
+    setFormData({ ...result });
+    setIsbnInput(result.isbn13 ?? '');
+    setMode('manual');
+  }
 
   async function handleIsbnLookup(isbn: string) {
     if (!isbn.trim()) return;
@@ -213,6 +235,71 @@ export default function AddBookScreen() {
     );
   }
 
+  if (mode === 'search') {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <View style={styles.searchHeader}>
+          <TouchableOpacity onPress={() => setMode('choose')} style={styles.searchBack}>
+            <Ionicons name="chevron-back" size={22} color={colors.primary} />
+          </TouchableOpacity>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Title, author, or keywords…"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={handleSearch}
+            returnKeyType="search"
+            autoFocus
+            placeholderTextColor={colors.textSecondary}
+          />
+          <TouchableOpacity style={styles.searchBtn} onPress={handleSearch} disabled={searching}>
+            {searching
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Ionicons name="search" size={20} color="#fff" />}
+          </TouchableOpacity>
+        </View>
+
+        <FlatList
+          data={searchResults}
+          keyExtractor={(_, i) => String(i)}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ padding: spacing.md, gap: spacing.sm }}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.searchResultRow} onPress={() => handleSearchResultSelect(item)} activeOpacity={0.7}>
+              {item.coverUrl ? (
+                <Image source={{ uri: item.coverUrl }} style={styles.searchResultCover} />
+              ) : (
+                <View style={[styles.searchResultCover, styles.searchResultCoverPlaceholder]}>
+                  <Ionicons name="book-outline" size={22} color={colors.border} />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.searchResultTitle} numberOfLines={2}>{item.title}</Text>
+                {item.authors.length > 0 && (
+                  <Text style={styles.searchResultAuthor} numberOfLines={1}>{item.authors.join(', ')}</Text>
+                )}
+                {item.publishedYear && (
+                  <Text style={styles.searchResultYear}>{item.publishedYear}</Text>
+                )}
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            !searching && searchResults.length === 0 ? (
+              <View style={{ alignItems: 'center', paddingTop: 60 }}>
+                <Ionicons name="search-outline" size={48} color={colors.border} />
+                <Text style={{ color: colors.textSecondary, marginTop: spacing.md, textAlign: 'center' }}>
+                  Search for a book by title, author, or keywords.
+                </Text>
+              </View>
+            ) : null
+          }
+        />
+      </SafeAreaView>
+    );
+  }
+
   if (mode === 'choose') {
     return (
       <SafeAreaView style={styles.container}>
@@ -222,6 +309,10 @@ export default function AddBookScreen() {
           <TouchableOpacity style={styles.btn} onPress={() => setMode('scan')}>
             <Ionicons name="barcode-outline" size={22} color="#fff" style={{ marginRight: spacing.sm }} />
             <Text style={styles.btnText}>Scan Barcode</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.btn, { backgroundColor: colors.accent ?? colors.textSecondary }]} onPress={() => { setSearchQuery(''); setSearchResults([]); setMode('search'); }}>
+            <Ionicons name="search-outline" size={22} color="#fff" style={{ marginRight: spacing.sm }} />
+            <Text style={styles.btnText}>Search by Title / Author</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.btn, { backgroundColor: colors.textSecondary }]} onPress={() => setMode('manual')}>
             <Ionicons name="pencil-outline" size={22} color="#fff" style={{ marginRight: spacing.sm }} />
@@ -376,6 +467,16 @@ const styles = StyleSheet.create({
   cancelLinkText: { color: colors.textSecondary, fontSize: 15 },
   backRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, gap: spacing.xs },
   backRowText: { color: colors.primary, fontSize: 14 },
+  searchHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderBottomWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  searchBack: { padding: spacing.xs },
+  searchInput: { flex: 1, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 15, color: colors.text },
+  searchBtn: { backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.sm, justifyContent: 'center', alignItems: 'center', width: 40, height: 40 },
+  searchResultRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  searchResultCover: { width: 44, height: 64, borderRadius: radius.sm },
+  searchResultCoverPlaceholder: { backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
+  searchResultTitle: { fontSize: 14, fontWeight: '600', color: colors.text },
+  searchResultAuthor: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+  searchResultYear: { fontSize: 12, color: colors.textMuted ?? colors.textSecondary, marginTop: 2 },
   scanOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center', padding: spacing.xl, gap: spacing.md, backgroundColor: 'rgba(0,0,0,0.5)' },
   scanFrame: { position: 'absolute', top: '30%', alignSelf: 'center', width: 260, height: 120, borderWidth: 2, borderColor: '#fff', borderRadius: radius.md },
   scanHint: { color: '#fff', fontSize: 14, textAlign: 'center' },

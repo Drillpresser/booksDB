@@ -99,4 +99,5 @@ export interface BookLookupResult {
   deweyDecimal: string | null;
   communityRating: number | null;
   communityRatingCount: number | null;
+  isbn13?: string | null;
 }
