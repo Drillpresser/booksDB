@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy – [Your App Name]</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #1a1a2e;
+      --ink-soft: #4a4a6a;
+      --ink-muted: #8888aa;
+      --surface: #fafaf8;
+      --surface-raised: #ffffff;
+      --rule: #e8e8f0;
+      --accent: #3b5bdb;
+      --accent-soft: #eef2ff;
+      --google-red: #ea4335;
+      --apple-dark: #1d1d1f;
+      --radius: 12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      font-size: 17px;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      background: var(--surface);
+      color: var(--ink);
+      line-height: 1.75;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ── */
+    .page-wrap {
+      max-width: 740px;
+      margin: 0 auto;
+      padding: 0 28px 80px;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 64px 0 48px;
+      border-bottom: 1px solid var(--rule);
+      margin-bottom: 56px;
+      animation: fadeUp .6s ease both;
+    }
+
+    .app-label {
+      display: inline-block;
+      font-size: .75rem;
+      font-weight: 500;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 400;
+      line-height: 1.15;
+      color: var(--ink);
+      margin-bottom: 16px;
+    }
+
+    .meta {
+      font-size: .85rem;
+      color: var(--ink-muted);
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .meta span::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--ink-muted);
+      margin-right: 8px;
+      vertical-align: middle;
+      opacity: .5;
+    }
+
+    /* ── Summary card ── */
+    .summary-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius);
+      padding: 28px 32px;
+      margin-bottom: 56px;
+      animation: fadeUp .6s .1s ease both;
+    }
+
+    .summary-card h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.1rem;
+      font-weight: 400;
+      margin-bottom: 16px;
+      color: var(--ink);
+    }
+
+    .summary-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .summary-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: .9rem;
+      color: var(--ink-soft);
+    }
+
+    .check {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #d3f9d8;
+      color: #2f9e44;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .75rem;
+      margin-top: 2px;
+    }
+
+    /* ── Auth badges ── */
+    .auth-badges {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 56px;
+      flex-wrap: wrap;
+      animation: fadeUp .6s .15s ease both;
+    }
+
+    .badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 999px;
+      border: 1px solid var(--rule);
+      background: var(--surface-raised);
+      font-size: .82rem;
+      font-weight: 500;
+      color: var(--ink-soft);
+    }
+
+    .badge svg { flex-shrink: 0; }
+
+    /* ── Sections ── */
+    .sections {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .section {
+      padding: 40px 0;
+      border-bottom: 1px solid var(--rule);
+      animation: fadeUp .5s ease both;
+    }
+
+    .section:last-child { border-bottom: none; }
+
+    .section-number {
+      font-size: .72rem;
+      font-weight: 500;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+      margin-bottom: 8px;
+    }
+
+    .section h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.35rem;
+      font-weight: 400;
+      color: var(--ink);
+      margin-bottom: 16px;
+    }
+
+    .section p {
+      color: var(--ink-soft);
+      font-size: .95rem;
+      margin-bottom: 14px;
+    }
+
+    .section p:last-child { margin-bottom: 0; }
+
+    /* ── Data table ── */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: .875rem;
+    }
+
+    .data-table th {
+      text-align: left;
+      padding: 10px 14px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 500;
+      font-size: .75rem;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+
+    .data-table th:first-child { border-radius: 8px 0 0 0; }
+    .data-table th:last-child { border-radius: 0 8px 0 0; }
+
+    .data-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--rule);
+      color: var(--ink-soft);
+      vertical-align: top;
+    }
+
+    .data-table tr:last-child td { border-bottom: none; }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 500;
+    }
+
+    .pill-green { background: #d3f9d8; color: #2f9e44; }
+    .pill-blue  { background: var(--accent-soft); color: var(--accent); }
+    .pill-grey  { background: #f0f0f4; color: var(--ink-muted); }
+
+    /* ── Provider blocks ── */
+    .provider-block {
+      border: 1px solid var(--rule);
+      border-radius: var(--radius);
+      padding: 22px 26px;
+      margin: 20px 0;
+      background: var(--surface-raised);
+    }
+
+    .provider-block h3 {
+      font-size: .95rem;
+      font-weight: 500;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .provider-block p {
+      margin-bottom: 8px !important;
+    }
+
+    .provider-block a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: .85rem;
+    }
+
+    .provider-block a:hover { text-decoration: underline; }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 72px;
+      padding-top: 32px;
+      border-top: 1px solid var(--rule);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: gap;
+      gap: 16px;
+    }
+
+    footer p {
+      font-size: .8rem;
+      color: var(--ink-muted);
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: .8rem;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .section:nth-child(1)  { animation-delay: .15s; }
+    .section:nth-child(2)  { animation-delay: .2s;  }
+    .section:nth-child(3)  { animation-delay: .25s; }
+    .section:nth-child(4)  { animation-delay: .3s;  }
+    .section:nth-child(5)  { animation-delay: .35s; }
+    .section:nth-child(6)  { animation-delay: .4s;  }
+    .section:nth-child(7)  { animation-delay: .45s; }
+    .section:nth-child(8)  { animation-delay: .5s;  }
+    .section:nth-child(9)  { animation-delay: .55s; }
+    .section:nth-child(10) { animation-delay: .6s;  }
+    .section:nth-child(11) { animation-delay: .65s; }
+    .section:nth-child(12) { animation-delay: .7s;  }
+
+    /* ── Responsive ── */
+    @media (max-width: 520px) {
+      .page-wrap { padding: 0 18px 60px; }
+      header { padding: 40px 0 36px; }
+      .summary-card { padding: 20px; }
+      .data-table { font-size: .8rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <header>
+    <div class="app-label">[Your App Name]</div>
+    <h1>Privacy Policy</h1>
+    <div class="meta">
+      <span>Effective: [Date]</span>
+      <span>Last updated: [Date]</span>
+      <span>Version 1.0</span>
+    </div>
+  </header>
+
+  <!-- Plain-English Summary -->
+  <div class="summary-card">
+    <h2>The short version</h2>
+    <ul class="summary-list">
+      <li>
+        <span class="check">✓</span>
+        We collect only your name and email address when you sign in — nothing more.
+      </li>
+      <li>
+        <span class="check">✓</span>
+        That information is used solely to identify your account inside the app.
+      </li>
+      <li>
+        <span class="check">✓</span>
+        We do not sell, share, or rent your personal data to any third party.
+      </li>
+      <li>
+        <span class="check">✓</span>
+        We do not use your data for advertising, profiling, or analytics.
+      </li>
+      <li>
+        <span class="check">✓</span>
+        You can request deletion of your data at any time by contacting us.
+      </li>
+    </ul>
+  </div>
+
+  <!-- Auth provider badges -->
+  <div class="auth-badges">
+    <div class="badge">
+      <!-- Google G logo -->
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      Sign in with Google
+    </div>
+    <div class="badge">
+      <!-- Apple logo -->
+      <svg width="14" height="16" viewBox="0 0 814 1000" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-47.4-148.2-116.1C46.4 787.3 0 663 0 541.8c0-207.9 134.9-318.3 267.7-318.3 70.6 0 129.3 46.4 173.5 46.4 42.8 0 109.7-49 190.5-49 30.8 0 130.2 2.6 198.3 99zM554.7 95.8c35.2-41.7 60.7-99.4 60.7-157.2 0-8.1-.6-16.3-1.9-24.4-58.1 2.3-126.8 38.9-167.4 82.8-31.5 35.2-61.4 92.3-61.4 150.8 0 8.8 1.3 17.5 1.9 20.2 3.2.6 8.4 1.3 13.6 1.3 52.3 0 115.3-35.2 154.5-73.5z"/>
+      </svg>
+      Sign in with Apple
+    </div>
+  </div>
+
+  <div class="sections">
+
+    <!-- 1. Introduction -->
+    <div class="section">
+      <div class="section-number">01</div>
+      <h2>Who We Are</h2>
+      <p>
+        [Your App Name] ("we," "our," or "us") is an iOS application developed by
+        [Your Name / Company Name]. This Privacy Policy explains what personal information
+        we collect when you use the app, why we collect it, and how we handle it.
+      </p>
+      <p>
+        If you have any questions about this policy, you can contact us at
+        <strong>[your@email.com]</strong>.
+      </p>
+    </div>
+
+    <!-- 2. What We Collect -->
+    <div class="section">
+      <div class="section-number">02</div>
+      <h2>What Information We Collect</h2>
+      <p>
+        We collect the minimum information necessary to let you sign in securely.
+        We do not collect location data, contacts, browsing history, device identifiers,
+        or any data beyond what is described below.
+      </p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Source</th>
+            <th>Purpose</th>
+            <th>Sold?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Full name</td>
+            <td><span class="pill pill-blue">Google / Apple</span></td>
+            <td>Display within the app</td>
+            <td><span class="pill pill-green">Never</span></td>
+          </tr>
+          <tr>
+            <td>Email address</td>
+            <td><span class="pill pill-blue">Google / Apple</span></td>
+            <td>Identify your account</td>
+            <td><span class="pill pill-green">Never</span></td>
+          </tr>
+          <tr>
+            <td>Profile picture</td>
+            <td><span class="pill pill-grey">Google only</span></td>
+            <td>Display within the app</td>
+            <td><span class="pill pill-green">Never</span></td>
+          </tr>
+          <tr>
+            <td>User identifier</td>
+            <td><span class="pill pill-blue">Google / Apple</span></td>
+            <td>Maintain your login session</td>
+            <td><span class="pill pill-green">Never</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        When you choose "Sign in with Apple" and elect to hide your email address,
+        Apple provides us with a private relay address instead. We treat this exactly
+        the same as a standard email address and use it solely to identify your account.
+      </p>
+    </div>
+
+    <!-- 3. How We Use It -->
+    <div class="section">
+      <div class="section-number">03</div>
+      <h2>How We Use Your Information</h2>
+      <p>
+        Your name, email, and profile picture are used for one purpose only:
+        to operate your account within [Your App Name]. Specifically, this means
+        displaying your name in the app interface and ensuring you are signed in
+        to the correct account.
+      </p>
+      <p>
+        We do <strong>not</strong> use your information to:
+      </p>
+      <ul style="list-style:none; display:flex; flex-direction:column; gap:8px; margin: 14px 0; color: #4a4a6a; font-size:.95rem;">
+        <li style="display:flex;gap:10px;align-items:flex-start;"><span style="color:#e03131;margin-top:3px;">✕</span> Send you marketing emails or push notifications</li>
+        <li style="display:flex;gap:10px;align-items:flex-start;"><span style="color:#e03131;margin-top:3px;">✕</span> Build a profile of your behaviour or interests</li>
+        <li style="display:flex;gap:10px;align-items:flex-start;"><span style="color:#e03131;margin-top:3px;">✕</span> Target you with advertising</li>
+        <li style="display:flex;gap:10px;align-items:flex-start;"><span style="color:#e03131;margin-top:3px;">✕</span> Train machine learning models</li>
+        <li style="display:flex;gap:10px;align-items:flex-start;"><span style="color:#e03131;margin-top:3px;">✕</span> Share or sell data to third parties</li>
+      </ul>
+    </div>
+
+    <!-- 4. Third-Party Auth Providers -->
+    <div class="section">
+      <div class="section-number">04</div>
+      <h2>Third-Party Sign-In Providers</h2>
+      <p>
+        We use Google and Apple as sign-in providers. When you choose to authenticate
+        with either service, you are subject to their own privacy policies in addition
+        to ours. We only receive the data you explicitly authorise during sign-in.
+      </p>
+
+      <div class="provider-block">
+        <h3>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Google Sign-In
+        </h3>
+        <p>
+          Our use of information received from Google Sign-In complies with the
+          <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">
+            Google API Services User Data Policy
+          </a>, including the Limited Use requirements.
+        </p>
+        <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">
+          Google Privacy Policy →
+        </a>
+      </div>
+
+      <div class="provider-block">
+        <h3>
+          <svg width="12" height="14" viewBox="0 0 814 1000" fill="#1d1d1f" xmlns="http://www.w3.org/2000/svg">
+            <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-47.4-148.2-116.1C46.4 787.3 0 663 0 541.8c0-207.9 134.9-318.3 267.7-318.3 70.6 0 129.3 46.4 173.5 46.4 42.8 0 109.7-49 190.5-49 30.8 0 130.2 2.6 198.3 99zM554.7 95.8c35.2-41.7 60.7-99.4 60.7-157.2 0-8.1-.6-16.3-1.9-24.4-58.1 2.3-126.8 38.9-167.4 82.8-31.5 35.2-61.4 92.3-61.4 150.8 0 8.8 1.3 17.5 1.9 20.2 3.2.6 8.4 1.3 13.6 1.3 52.3 0 115.3-35.2 154.5-73.5z"/>
+          </svg>
+          Sign in with Apple
+        </h3>
+        <p>
+          When you use Sign in with Apple, Apple may provide us with a name and either
+          your real email address or a private relay address. We store only what Apple
+          provides and use it solely to maintain your account.
+        </p>
+        <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noopener">
+          Apple Privacy Policy →
+        </a>
+      </div>
+    </div>
+
+    <!-- 5. Data Storage & Security -->
+    <div class="section">
+      <div class="section-number">05</div>
+      <h2>Data Storage &amp; Security</h2>
+      <p>
+        Your account information is stored securely on servers hosted with
+        <strong>[Provider, e.g. AWS / Firebase]</strong> in the
+        <strong>United States</strong>. We use industry-standard encryption in transit
+        (TLS) and at rest.
+      </p>
+      <p>
+        We retain your data for as long as your account is active. If you delete your
+        account or request data removal, we will delete your information within
+        <strong>30 days</strong>.
+      </p>
+    </div>
+
+    <!-- 6. Your Rights -->
+    <div class="section">
+      <div class="section-number">06</div>
+      <h2>Your Rights</h2>
+      <p>
+        Regardless of where you live, you have the right to:
+      </p>
+      <ul style="list-style:none; display:flex; flex-direction:column; gap:10px; margin:14px 0; color:#4a4a6a; font-size:.95rem;">
+        <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;margin-top:2px;">→</span> <strong>Access</strong> the personal data we hold about you</li>
+        <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;margin-top:2px;">→</span> <strong>Correct</strong> inaccurate data (in most cases by updating your Google or Apple account)</li>
+        <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;margin-top:2px;">→</span> <strong>Delete</strong> your data by contacting us at <strong>[your@email.com]</strong></li>
+        <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;margin-top:2px;">→</span> <strong>Withdraw</strong> access at any time via your Google account settings or Apple ID settings</li>
+        <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;margin-top:2px;">→</span> <strong>Object</strong> to or restrict how we process your data</li>
+        <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;margin-top:2px;">→</span> <strong>Portability</strong> — receive a copy of your data in a machine-readable format</li>
+      </ul>
+      <p>
+        To exercise any of these rights, contact us at <strong>[your@email.com]</strong>.
+        We will respond within <strong>30 days</strong>. We will never charge a fee for
+        handling your request unless it is manifestly unfounded or excessive.
+      </p>
+      <p>
+        To revoke Google Sign-In access independently of deleting your account, visit
+        <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener" style="color:var(--accent);">myaccount.google.com/permissions</a>.
+        For Apple, visit Settings → [Your Name] → Password &amp; Security → Apps Using Apple ID.
+      </p>
+    </div>
+
+    <!-- 7. Children -->
+    <div class="section">
+      <div class="section-number">07</div>
+      <h2>Children's Privacy</h2>
+      <p>
+        [Your App Name] is not directed at children under the age of 13 (or 16 in the EU).
+        We do not knowingly collect personal information from children. If you believe a
+        child has provided us with their information, please contact us and we will delete
+        it promptly.
+      </p>
+    </div>
+
+    <!-- 8. GDPR -->
+    <div class="section">
+      <div class="section-number">08</div>
+      <h2>GDPR — Rights for Users in the EU / EEA</h2>
+      <p>
+        If you are located in the European Union or European Economic Area, the
+        General Data Protection Regulation (GDPR) gives you specific rights over
+        your personal data. This section explains how those rights apply to your
+        use of [Your App Name].
+      </p>
+
+      <div class="provider-block" style="margin: 20px 0;">
+        <h3 style="font-size:.9rem; margin-bottom:10px;">Lawful basis for processing</h3>
+        <p>
+          We process your personal data under <strong>Article 6(1)(b) GDPR</strong> —
+          processing is necessary to perform the contract between you and us (i.e.
+          providing your account and the app's core functionality). We do not rely on
+          consent or legitimate interest as our lawful basis.
+        </p>
+      </div>
+
+      <div class="provider-block" style="margin: 20px 0;">
+        <h3 style="font-size:.9rem; margin-bottom:10px;">International data transfers</h3>
+        <p>
+          Your data is stored on servers in the <strong>United States</strong>, which
+          is outside the EU/EEA. The US does not have an adequacy decision from the
+          European Commission covering all transfers. We ensure appropriate safeguards
+          are in place for any such transfer through the use of
+          <strong>Standard Contractual Clauses (SCCs)</strong> as approved by the
+          European Commission, or by relying on the privacy commitments of our
+          infrastructure provider (e.g. [AWS / Firebase / other] adheres to SCCs).
+        </p>
+        <p style="margin-top:8px;">
+          You may request a copy of the applicable transfer mechanism by contacting us
+          at <a href="mailto:[your@email.com]">[your@email.com]</a>.
+        </p>
+      </div>
+
+      <div class="provider-block" style="margin: 20px 0;">
+        <h3 style="font-size:.9rem; margin-bottom:10px;">Your GDPR rights in full</h3>
+        <p>Under the GDPR you have the right to:</p>
+        <ul style="list-style:none; display:flex; flex-direction:column; gap:8px; margin:10px 0 0; font-size:.875rem; color:#4a4a6a;">
+          <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;">→</span> <span><strong>Access (Art. 15)</strong> — obtain a copy of your personal data</span></li>
+          <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;">→</span> <span><strong>Rectification (Art. 16)</strong> — correct inaccurate or incomplete data</span></li>
+          <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;">→</span> <span><strong>Erasure (Art. 17)</strong> — request deletion of your data ("right to be forgotten")</span></li>
+          <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;">→</span> <span><strong>Restriction (Art. 18)</strong> — ask us to limit how we process your data</span></li>
+          <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;">→</span> <span><strong>Portability (Art. 20)</strong> — receive your data in a structured, machine-readable format</span></li>
+          <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;">→</span> <span><strong>Object (Art. 21)</strong> — object to processing based on legitimate interests</span></li>
+        </ul>
+      </div>
+
+      <p>
+        To exercise any GDPR right, email us at <strong>[your@email.com]</strong>.
+        We will respond within <strong>30 days</strong> (extendable by two further months
+        for complex requests, with notice). If you believe we have not handled your data
+        lawfully, you have the right to lodge a complaint with your local
+        <strong>supervisory authority</strong> (e.g. the ICO in the UK, CNIL in France,
+        or your national DPA).
+      </p>
+    </div>
+
+    <!-- 9. CCPA -->
+    <div class="section">
+      <div class="section-number">09</div>
+      <h2>CCPA — Rights for California Residents</h2>
+      <p>
+        If you are a resident of California, the California Consumer Privacy Act (CCPA)
+        as amended by the California Privacy Rights Act (CPRA) gives you specific rights
+        regarding your personal information.
+      </p>
+
+      <div class="provider-block" style="margin: 20px 0;">
+        <h3 style="font-size:.9rem; margin-bottom:10px;">Categories of personal information collected</h3>
+        <p>
+          In the past 12 months we have collected the following categories of personal
+          information as defined by the CCPA: <strong>Identifiers</strong> (name, email
+          address, user ID). We have not collected any other category.
+        </p>
+      </div>
+
+      <div class="provider-block" style="margin: 20px 0;">
+        <h3 style="font-size:.9rem; margin-bottom:10px;">We do not sell or share your data</h3>
+        <p>
+          We do <strong>not</strong> sell, share, rent, or otherwise disclose your
+          personal information to third parties for monetary or other valuable
+          consideration. We do not use your data for cross-context behavioural
+          advertising. Because we do not sell personal information, we do not offer a
+          "Do Not Sell My Personal Information" opt-out — there is nothing to opt out of.
+        </p>
+      </div>
+
+      <p>Your rights under the CCPA / CPRA include:</p>
+      <ul style="list-style:none; display:flex; flex-direction:column; gap:8px; margin:14px 0; color:#4a4a6a; font-size:.95rem;">
+        <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;margin-top:2px;">→</span> <strong>Know</strong> what personal information we collect, use, and disclose</li>
+        <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;margin-top:2px;">→</span> <strong>Delete</strong> personal information we hold about you</li>
+        <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;margin-top:2px;">→</span> <strong>Correct</strong> inaccurate personal information</li>
+        <li style="display:flex;gap:10px;"><span style="color:#3b5bdb;margin-top:2px;">→</span> <strong>Non-discrimination</strong> — we will not treat you differently for exercising your rights</li>
+      </ul>
+      <p>
+        To exercise any of these rights, contact us at <strong>[your@email.com]</strong>.
+        We will verify your identity before responding and will reply within
+        <strong>45 days</strong>, extendable by a further 45 days with notice.
+        We will never charge a fee unless your request is excessive or repetitive.
+      </p>
+    </div>
+
+    <!-- 10. Data Breach -->
+    <div class="section">
+      <div class="section-number">10</div>
+      <h2>Data Breach Notification</h2>
+      <p>
+        Despite our security measures, no system is completely immune to risk.
+        In the event of a personal data breach, we will take the following steps:
+      </p>
+      <ul style="list-style:none; display:flex; flex-direction:column; gap:10px; margin:14px 0; color:#4a4a6a; font-size:.95rem;">
+        <li style="display:flex;gap:10px;align-items:flex-start;">
+          <span style="color:#3b5bdb;margin-top:2px; flex-shrink:0;">→</span>
+          <span><strong>Contain the breach</strong> — we will immediately act to stop further unauthorised access and assess the scope of the incident.</span>
+        </li>
+        <li style="display:flex;gap:10px;align-items:flex-start;">
+          <span style="color:#3b5bdb;margin-top:2px; flex-shrink:0;">→</span>
+          <span><strong>Notify regulators (GDPR)</strong> — if you are an EU/EEA user and the breach is likely to result in a risk to your rights and freedoms, we will notify the relevant supervisory authority within <strong>72 hours</strong> of becoming aware of the breach, as required by Article 33 GDPR.</span>
+        </li>
+        <li style="display:flex;gap:10px;align-items:flex-start;">
+          <span style="color:#3b5bdb;margin-top:2px; flex-shrink:0;">→</span>
+          <span><strong>Notify affected users (GDPR)</strong> — if the breach is likely to result in a <em>high</em> risk to your rights and freedoms, we will notify you directly without undue delay (Article 34 GDPR), describing the nature of the breach, the data involved, and the steps we are taking.</span>
+        </li>
+        <li style="display:flex;gap:10px;align-items:flex-start;">
+          <span style="color:#3b5bdb;margin-top:2px; flex-shrink:0;">→</span>
+          <span><strong>Notify affected users (CCPA / US state laws)</strong> — if you are a California or other US-state resident, we will notify you in the most expedient time possible and without unreasonable delay, consistent with applicable state breach notification laws.</span>
+        </li>
+        <li style="display:flex;gap:10px;align-items:flex-start;">
+          <span style="color:#3b5bdb;margin-top:2px; flex-shrink:0;">→</span>
+          <span><strong>Remediate</strong> — we will take appropriate technical and organisational steps to prevent a recurrence and document the incident in an internal breach register.</span>
+        </li>
+      </ul>
+      <p>
+        Breach notifications to users will be sent to the email address associated
+        with your account. If you believe your account has been compromised, please
+        contact us immediately at <strong>[your@email.com]</strong>.
+      </p>
+    </div>
+
+    <!-- 11. Changes -->
+    <div class="section">
+      <div class="section-number">11</div>
+      <h2>Changes to This Policy</h2>
+      <p>
+        We may update this Privacy Policy from time to time. When we do, we will revise
+        the "Last updated" date at the top of the page. Continued use of the app after
+        changes are posted constitutes your acceptance of the revised policy.
+      </p>
+    </div>
+
+    <!-- 12. Contact -->
+    <div class="section">
+      <div class="section-number">12</div>
+      <h2>Contact Us</h2>
+      <p>
+        If you have questions, concerns, or requests regarding this Privacy Policy
+        or your personal data, please contact us:
+      </p>
+      <div class="provider-block" style="margin-top:16px;">
+        <p><strong>[Your Name / Company Name]</strong></p>
+        <p>Email: <a href="mailto:[your@email.com]">[your@email.com]</a></p>
+        <p style="margin-bottom:0 !important;">[Optional: physical address if required by your jurisdiction]</p>
+      </div>
+    </div>
+
+  </div><!-- /sections -->
+
+  <footer>
+    <p>© [Year] [Your App Name]. All rights reserved.</p>
+    <a href="mailto:[your@email.com]">Contact us</a>
+  </footer>
+
+</div><!-- /page-wrap -->
+</body>
+</html>
