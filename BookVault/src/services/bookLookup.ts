@@ -14,6 +14,27 @@ async function fetchWithTimeout(url: string, ms = 5000): Promise<Response> {
   }
 }
 
+// Merge two results field-by-field, preferring whichever source has each field.
+// OL is primary for deweyDecimal/coverUrl (large images); Google for synopsis/ratings.
+function mergeResults(ol: BookLookupResult | null, google: BookLookupResult | null): BookLookupResult | null {
+  if (!ol && !google) return null;
+  if (!ol) return google;
+  if (!google) return ol;
+  return {
+    title: ol.title || google.title,
+    authors: ol.authors.length ? ol.authors : google.authors,
+    publisher: ol.publisher ?? google.publisher,
+    publishedYear: ol.publishedYear ?? google.publishedYear,
+    pageCount: ol.pageCount ?? google.pageCount,
+    synopsis: google.synopsis ?? ol.synopsis,
+    coverUrl: ol.coverUrl ?? google.coverUrl,
+    deweyDecimal: ol.deweyDecimal ?? null,
+    communityRating: google.communityRating ?? null,
+    communityRatingCount: google.communityRatingCount ?? null,
+    isbn13: ol.isbn13 ?? google.isbn13,
+  };
+}
+
 export async function lookupByIsbn(isbn: string): Promise<BookLookupResult | null> {
   const clean = isbn.replace(/[^0-9X]/gi, '');
 
@@ -34,9 +55,11 @@ export async function lookupByIsbn(isbn: string): Promise<BookLookupResult | nul
     };
   }
 
-  const result = await lookupOpenLibrary(clean);
-  if (result) return result;
-  return lookupGoogleBooks(clean);
+  const [olResult, googleResult] = await Promise.all([
+    lookupOpenLibrary(clean),
+    lookupGoogleBooks(clean),
+  ]);
+  return mergeResults(olResult, googleResult);
 }
 
 async function lookupOpenLibrary(isbn: string): Promise<BookLookupResult | null> {
@@ -102,7 +125,9 @@ async function lookupOpenLibrary(isbn: string): Promise<BookLookupResult | null>
 async function lookupGoogleBooks(isbn: string): Promise<BookLookupResult | null> {
   try {
     const key = GOOGLE_BOOKS_API_KEY ? `&key=${GOOGLE_BOOKS_API_KEY}` : '';
-    const res = await fetchWithTimeout(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}${key}`);
+    const res = await fetchWithTimeout(
+      `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&langRestrict=en${key}`
+    );
     if (!res.ok) return null;
     const data = await res.json();
     const item = data.items?.[0];
@@ -139,21 +164,47 @@ async function lookupGoogleBooks(isbn: string): Promise<BookLookupResult | null>
 
 export async function searchBooks(query: string): Promise<BookLookupResult[]> {
   if (!query.trim()) return [];
-  const results = await searchOpenLibrary(query);
-  if (results.length > 0) return results;
-  return searchGoogleBooks(query);
+
+  const [olResults, googleResults] = await Promise.all([
+    searchOpenLibrary(query),
+    searchGoogleBooks(query),
+  ]);
+
+  // Deduplicate by isbn13, merging fields from both sources where they match.
+  const byIsbn = new Map<string, BookLookupResult>();
+  const noIsbn: BookLookupResult[] = [];
+
+  for (const r of olResults) {
+    if (r.isbn13) byIsbn.set(r.isbn13, r);
+    else noIsbn.push(r);
+  }
+  for (const r of googleResults) {
+    if (r.isbn13) {
+      const existing = byIsbn.get(r.isbn13);
+      byIsbn.set(r.isbn13, existing ? mergeResults(existing, r)! : r);
+    } else {
+      noIsbn.push(r);
+    }
+  }
+
+  return [...byIsbn.values(), ...noIsbn].slice(0, 30);
 }
 
 async function searchOpenLibrary(query: string): Promise<BookLookupResult[]> {
   try {
     const q = encodeURIComponent(query.trim());
     const res = await fetchWithTimeout(
-      `https://openlibrary.org/search.json?q=${q}&fields=key,title,author_name,cover_i,first_publish_year,isbn&limit=20`
+      `https://openlibrary.org/search.json?q=${q}&lang=eng&fields=key,title,author_name,cover_i,first_publish_year,isbn,language&limit=30`
     );
     if (!res.ok) return [];
     const data = await res.json();
     return ((data.docs ?? []) as any[])
-      .filter((d) => d.title)
+      .filter((d) => {
+        if (!d.title) return false;
+        // Keep if language data is absent (assume English) or includes English
+        if (d.language && !d.language.includes('eng')) return false;
+        return true;
+      })
       .map((d) => ({
         title: d.title as string,
         authors: (d.author_name as string[]) ?? [],
@@ -179,7 +230,7 @@ async function searchGoogleBooks(query: string): Promise<BookLookupResult[]> {
     const key = GOOGLE_BOOKS_API_KEY ? `&key=${GOOGLE_BOOKS_API_KEY}` : '';
     const q = encodeURIComponent(query.trim());
     const res = await fetchWithTimeout(
-      `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=20${key}`
+      `https://www.googleapis.com/books/v1/volumes?q=${q}&langRestrict=en&maxResults=20${key}`
     );
     if (!res.ok) return [];
     const data = await res.json();
