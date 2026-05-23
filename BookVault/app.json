@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "scheme": "bookvault",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": false,
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.bookvault.app",
