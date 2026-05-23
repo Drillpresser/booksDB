@@ -2,7 +2,7 @@ import { getRecordByIsbn } from '../database/queries/books';
 import type { BookLookupResult } from '../types';
 
 // Get a free key at console.cloud.google.com → APIs → Books API
-const GOOGLE_BOOKS_API_KEY = '';
+const GOOGLE_BOOKS_API_KEY = 'AIzaSyBUcZK1up9hPbDtsZv5yTlxyvKQf3Mltaw';
 
 async function fetchWithTimeout(url: string, ms = 5000): Promise<Response> {
   const ctrl = new AbortController();
