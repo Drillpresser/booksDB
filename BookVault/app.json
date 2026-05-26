@@ -2,6 +2,7 @@
   "expo": {
     "name": "BookVault",
     "slug": "bookvault",
+    "owner": "Drillpresser",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "bookvault",
@@ -9,8 +10,10 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.bookvault.app",
+      "newArchEnabled": false,
       "infoPlist": {
-        "UIDesignRequiresCompatibility": true
+        "UIDesignRequiresCompatibility": true,
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "plugins": [
@@ -20,7 +23,15 @@
         {
           "cameraPermission": "BookVault uses your camera to scan book barcodes."
         }
-      ]
-    ]
+      ],
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "89985565-afad-4d23-b42d-2e13c2356f53"
+      }
+    }
   }
 }

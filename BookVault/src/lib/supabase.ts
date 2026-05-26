@@ -2,10 +2,8 @@ import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 
-// After creating your project at supabase.com, paste the values from
-// Project Settings → API into the two constants below.
-export const SUPABASE_URL = 'https://xukrezkcuufoqkiwnkkj.supabase.co';
-export const SUPABASE_ANON_KEY = 'sb_publishable_gP8CV1N_XYBLYC2RzHYGug_XL1hc0RN';
+export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
 const SecureStoreAdapter = {
   getItem: (key: string) => SecureStore.getItemAsync(key),
