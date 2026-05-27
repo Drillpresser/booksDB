@@ -15,7 +15,8 @@
       "infoPlist": {
         "UIDesignRequiresCompatibility": true,
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "buildNumber": "2"
     },
     "plugins": [
       "expo-router",
