@@ -175,9 +175,14 @@ export default function LibraryScreen() {
   return (
     <SafeAreaView style={styles.container} edges={[]}>
       <Stack.Screen options={{ headerRight: () => (
-        <TouchableOpacity onPress={() => router.push('/library/add')} style={{ padding: spacing.xs }}>
-          <Ionicons name="add" size={28} color="#FFFFFF" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => router.push('/library/shelves')} style={{ padding: spacing.xs, marginRight: spacing.xs }}>
+            <Ionicons name="bookmarks-outline" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/library/add')} style={{ padding: spacing.xs }}>
+            <Ionicons name="add" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
       )}} />
       <View style={styles.searchBar}>
         <Ionicons name="search" size={18} color={colors.textSecondary} style={{ marginRight: spacing.sm }} />

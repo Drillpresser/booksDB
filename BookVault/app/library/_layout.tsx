@@ -18,6 +18,8 @@ export default function LibraryLayout() {
       <Stack.Screen name="index" options={{ title: 'Library', ...backButton }} />
       <Stack.Screen name="add" options={{ title: 'Add Book', presentation: 'modal', ...backButton }} />
       <Stack.Screen name="[copyId]" options={{ title: 'Book Detail', ...backButton }} />
+      <Stack.Screen name="shelves/index" options={{ title: 'Shelves', ...backButton }} />
+      <Stack.Screen name="shelves/[shelfId]" options={{ title: 'Shelf', ...backButton }} />
     </Stack>
   );
 }

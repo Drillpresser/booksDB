@@ -43,6 +43,7 @@ export interface BookCopy {
   recordId: string;
   copyNumber: number;
   divisionId: string | null;
+  shelfId: string | null;
   personalRating: number | null;
   notes: string | null;
   dateAdded: string;
@@ -53,6 +54,7 @@ export interface BookCopyWithDetails extends BookCopy {
   division: Division | null;
   section: Section | null;
   mainClass: MainClass | null;
+  shelf: Shelf | null;
   isOnLoan: boolean;
   currentLoan: LoanWithContact | null;
 }
@@ -84,6 +86,13 @@ export interface LoanWithDetails extends Loan {
   bookRecord: BookRecord;
   bookCopy: BookCopy;
   isOverdue: boolean;
+}
+
+export interface Shelf {
+  id: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
 }
 
 export interface ClassificationSystem {

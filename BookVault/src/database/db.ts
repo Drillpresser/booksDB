@@ -120,7 +120,21 @@ function migrate(db: SQLite.SQLiteDatabase) {
 
     CREATE INDEX IF NOT EXISTS idx_cls_nodes_system ON classification_nodes(system_id, depth, sort_order);
     CREATE INDEX IF NOT EXISTS idx_cls_nodes_parent ON classification_nodes(parent_id);
+
+    CREATE TABLE IF NOT EXISTS shelves (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
   `);
+
+  // Idempotent column additions (ALTER TABLE does not support IF NOT EXISTS)
+  try {
+    db.execSync('ALTER TABLE book_copies ADD COLUMN shelf_id TEXT REFERENCES shelves(id) ON DELETE SET NULL');
+  } catch {
+    // Column already exists
+  }
 }
 
 export function generateId(): string {

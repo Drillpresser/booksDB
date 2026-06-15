@@ -47,6 +47,7 @@ function rowToCopy(row: any): BookCopy {
     recordId: row.record_id,
     copyNumber: row.copy_number,
     divisionId: row.division_id,
+    shelfId: row.shelf_id ?? null,
     personalRating: row.personal_rating,
     notes: row.notes,
     dateAdded: row.date_added,
@@ -55,7 +56,7 @@ function rowToCopy(row: any): BookCopy {
 
 const COPY_DETAIL_QUERY = `
   SELECT
-    bc.id, bc.record_id, bc.copy_number, bc.division_id,
+    bc.id, bc.record_id, bc.copy_number, bc.division_id, bc.shelf_id,
     bc.personal_rating, bc.notes, bc.date_added,
     br.title, br.authors, br.sort_author, br.isbn13,
     br.publisher, br.published_year, br.page_count,
@@ -64,12 +65,14 @@ const COPY_DETAIL_QUERY = `
     d.id AS d_id, d.code AS d_code, d.name AS d_name, d.section_id AS d_section_id, d.sort_order AS d_sort,
     s.id AS s_id, s.code AS s_code, s.name AS s_name, s.main_class_id AS s_main_class_id, s.sort_order AS s_sort,
     m.id AS m_id, m.code AS m_code, m.name AS m_name, m.sort_order AS m_sort,
+    sh.id AS sh_id, sh.name AS sh_name, sh.description AS sh_desc, sh.sort_order AS sh_sort,
     (SELECT COUNT(*) FROM loans l WHERE l.copy_id = bc.id AND l.date_returned IS NULL) AS on_loan_count
   FROM book_copies bc
   JOIN book_records br ON bc.record_id = br.id
   LEFT JOIN divisions d ON bc.division_id = d.id
   LEFT JOIN sections s ON d.section_id = s.id
   LEFT JOIN main_classes m ON s.main_class_id = m.id
+  LEFT JOIN shelves sh ON bc.shelf_id = sh.id
 `;
 
 function rowToDetail(row: any): BookCopyWithDetails {
@@ -81,6 +84,7 @@ function rowToDetail(row: any): BookCopyWithDetails {
     recordId: row.record_id,
     copyNumber: row.copy_number,
     divisionId: row.division_id,
+    shelfId: row.shelf_id ?? null,
     personalRating: row.personal_rating,
     notes: row.notes,
     dateAdded: row.date_added,
@@ -92,6 +96,7 @@ function rowToDetail(row: any): BookCopyWithDetails {
     division: row.d_id ? { id: row.d_id, code: row.d_code, name: row.d_name, sectionId: row.d_section_id, sortOrder: row.d_sort } : null,
     section: row.s_id ? { id: row.s_id, code: row.s_code, name: row.s_name, mainClassId: row.s_main_class_id, sortOrder: row.s_sort } : null,
     mainClass: row.m_id ? { id: row.m_id, code: row.m_code, name: row.m_name, sortOrder: row.m_sort } : null,
+    shelf: row.sh_id ? { id: row.sh_id, name: row.sh_name, description: row.sh_desc ?? null, sortOrder: row.sh_sort } : null,
     isOnLoan: row.on_loan_count > 0,
     currentLoan: null,
   };
@@ -177,11 +182,20 @@ export function insertBookCopy(data: Omit<BookCopy, 'id'>): string {
   const db = getDB();
   const id = generateId();
   db.runSync(
-    `INSERT INTO book_copies (id, record_id, copy_number, division_id, personal_rating, notes, date_added)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [id, data.recordId, data.copyNumber, data.divisionId, data.personalRating, data.notes, data.dateAdded]
+    `INSERT INTO book_copies (id, record_id, copy_number, division_id, shelf_id, personal_rating, notes, date_added)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, data.recordId, data.copyNumber, data.divisionId, data.shelfId ?? null, data.personalRating, data.notes, data.dateAdded]
   );
   return id;
+}
+
+export function getCopiesByShelf(shelfId: string): BookCopyWithDetails[] {
+  const db = getDB();
+  const rows = db.getAllSync(
+    `${COPY_DETAIL_QUERY} WHERE bc.shelf_id = ? ORDER BY br.sort_author, br.title`,
+    [shelfId]
+  ) as any[];
+  return rows.map(rowToDetail);
 }
 
 export function updateBookRecord(id: string, data: Partial<Omit<BookRecord, 'id'>>) {
