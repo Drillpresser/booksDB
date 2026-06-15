@@ -88,6 +88,38 @@ function migrate(db: SQLite.SQLiteDatabase) {
       FOREIGN KEY (copy_id) REFERENCES book_copies(id) ON DELETE CASCADE,
       FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS classification_systems (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS classification_nodes (
+      id TEXT PRIMARY KEY,
+      system_id TEXT NOT NULL,
+      code TEXT NOT NULL,
+      label TEXT NOT NULL,
+      parent_id TEXT,
+      depth INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (system_id) REFERENCES classification_systems(id) ON DELETE CASCADE,
+      FOREIGN KEY (parent_id) REFERENCES classification_nodes(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS book_copy_classifications (
+      copy_id TEXT NOT NULL,
+      node_id TEXT NOT NULL,
+      system_id TEXT NOT NULL,
+      PRIMARY KEY (copy_id, system_id),
+      FOREIGN KEY (copy_id) REFERENCES book_copies(id) ON DELETE CASCADE,
+      FOREIGN KEY (node_id) REFERENCES classification_nodes(id) ON DELETE CASCADE,
+      FOREIGN KEY (system_id) REFERENCES classification_systems(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_cls_nodes_system ON classification_nodes(system_id, depth, sort_order);
+    CREATE INDEX IF NOT EXISTS idx_cls_nodes_parent ON classification_nodes(parent_id);
   `);
 }
 

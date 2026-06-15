@@ -40,6 +40,13 @@ export default function RootLayout() {
         }}
       />
       <Tabs.Screen
+        name="classifications"
+        options={{
+          title: 'Classify',
+          tabBarIcon: ({ color, size }) => <Ionicons name="bookmarks-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',

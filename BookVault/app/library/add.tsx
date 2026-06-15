@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Alert, Modal, FlatList, Image,
@@ -9,10 +9,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
 import { lookupByIsbn, searchBooks, deriveSortAuthor } from '../../src/services/bookLookup';
-import { lookupBookWithClaude, fillMissingFields, suggestClassification, getApiKey } from '../../src/services/claude';
+import { lookupBookWithClaude, fillMissingFields, getApiKey } from '../../src/services/claude';
 import { insertBookRecord, insertBookCopy, saveCoverImage, getRecordByIsbn, getCopyCountForRecord } from '../../src/database/queries/books';
-import { getAllMainClasses, getSectionsByMainClass, getDivisionsBySection } from '../../src/database/queries/classifications';
-import type { BookLookupResult, MainClass, Section, Division } from '../../src/types';
+import { getAllSystems, getRootNodes, getChildNodes, hasChildren, searchNodes, setBookCopyClassification } from '../../src/database/queries/classificationSystems';
+import type { BookLookupResult, ClassificationSystem, ClassificationNode } from '../../src/types';
 
 type AddMode = 'choose' | 'scan' | 'search' | 'manual';
 
@@ -22,25 +22,39 @@ export default function AddBookScreen() {
   const [isbnInput, setIsbnInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<BookLookupResult>>({});
-  const [selectedDivisionId, setSelectedDivisionId] = useState<string | null>(null);
-  const [classPickerVisible, setClassPickerVisible] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const scanned = useRef(false);
 
-  const [mainClasses, setMainClasses] = useState<MainClass[]>([]);
-  const [sections, setSections] = useState<Section[]>([]);
-  const [divisions, setDivisions] = useState<Division[]>([]);
-  const [selectedMainClass, setSelectedMainClass] = useState<MainClass | null>(null);
-  const [selectedSection, setSelectedSection] = useState<Section | null>(null);
-  const [selectedDivision, setSelectedDivision] = useState<Division | null>(null);
-  const [classPickerLevel, setClassPickerLevel] = useState<'main' | 'section' | 'division'>('main');
+  // Classification state
+  const [systems, setSystems] = useState<ClassificationSystem[]>([]);
+  // systemId → selected nodeId
+  const [selectedClassifications, setSelectedClassifications] = useState<Record<string, string | null>>({});
+  // systemId → display label for the selected node
+  const [selectedLabels, setSelectedLabels] = useState<Record<string, string>>({});
+
+  // Picker modal state
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerSystemId, setPickerSystemId] = useState<string | null>(null);
+  const [pickerStack, setPickerStack] = useState<ClassificationNode[]>([]);
+  const [pickerNodes, setPickerNodes] = useState<ClassificationNode[]>([]);
+  const [pickerSearch, setPickerSearch] = useState('');
+  const [pickerSearchResults, setPickerSearchResults] = useState<ClassificationNode[] | null>(null);
+
+  // Search mode state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<BookLookupResult[]>([]);
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
-    setMainClasses(getAllMainClasses());
+    setSystems(getAllSystems());
   }, []);
+
+  useEffect(() => {
+    if (!pickerSystemId || !pickerSearch.trim()) { setPickerSearchResults(null); return; }
+    setPickerSearchResults(searchNodes(pickerSystemId, pickerSearch.trim()));
+  }, [pickerSearch, pickerSystemId]);
+
+  // --- Search mode ---
 
   async function handleSearch() {
     if (!searchQuery.trim()) return;
@@ -61,6 +75,8 @@ export default function AddBookScreen() {
     setMode('manual');
   }
 
+  // --- ISBN lookup ---
+
   async function handleIsbnLookup(isbn: string) {
     if (!isbn.trim()) return;
     setLoading(true);
@@ -68,9 +84,7 @@ export default function AddBookScreen() {
       let result = await lookupByIsbn(isbn.trim());
       if (!result) {
         const hasKey = await getApiKey();
-        if (hasKey) {
-          result = await lookupBookWithClaude(isbn.trim());
-        }
+        if (hasKey) result = await lookupBookWithClaude(isbn.trim());
       }
       if (result) {
         setFormData({ ...result });
@@ -85,6 +99,8 @@ export default function AddBookScreen() {
       setLoading(false);
     }
   }
+
+  // --- Claude fill ---
 
   async function handleAskClaude() {
     const hasKey = await getApiKey();
@@ -101,37 +117,47 @@ export default function AddBookScreen() {
     }
   }
 
-  async function handleSuggestClassification() {
-    const hasKey = await getApiKey();
-    if (!hasKey) {
-      Alert.alert('No API Key', 'Add your Anthropic API key in Settings to use Claude.');
-      return;
-    }
-    if (!formData.title) {
-      Alert.alert('Title Required', 'Enter a title before requesting a classification suggestion.');
-      return;
-    }
-    setLoading(true);
-    try {
-      const allSections = mainClasses.flatMap((m) => getSectionsByMainClass(m.id));
-      const allDivisions = allSections.flatMap((s) => getDivisionsBySection(s.id));
-      const suggestion = await suggestClassification(
-        { title: formData.title ?? '', authors: formData.authors ?? [], synopsis: formData.synopsis ?? null, deweyDecimal: formData.deweyDecimal ?? null },
-        { mainClasses, sections: allSections, divisions: allDivisions }
-      );
-      if (suggestion.divisionId) {
-        const div = allDivisions.find((d) => d.id === suggestion.divisionId) ?? null;
-        const sec = div ? allSections.find((s) => s.id === div.sectionId) ?? null : null;
-        const mc = sec ? mainClasses.find((m) => m.id === sec.mainClassId) ?? null : null;
-        setSelectedDivision(div);
-        setSelectedSection(sec);
-        setSelectedMainClass(mc);
-        setSelectedDivisionId(suggestion.divisionId);
-      }
-    } finally {
-      setLoading(false);
-    }
+  // --- Classification picker ---
+
+  function openPicker(systemId: string) {
+    setPickerSystemId(systemId);
+    setPickerStack([]);
+    setPickerNodes(getRootNodes(systemId));
+    setPickerSearch('');
+    setPickerSearchResults(null);
+    setPickerVisible(true);
   }
+
+  function pickerDrillInto(node: ClassificationNode) {
+    const children = getChildNodes(node.id);
+    setPickerStack(prev => [...prev, node]);
+    setPickerNodes(children);
+    setPickerSearch('');
+    setPickerSearchResults(null);
+  }
+
+  function pickerGoBack() {
+    const newStack = [...pickerStack];
+    newStack.pop();
+    setPickerStack(newStack);
+    const parent = newStack[newStack.length - 1];
+    setPickerNodes(parent ? getChildNodes(parent.id) : getRootNodes(pickerSystemId!));
+    setPickerSearch('');
+    setPickerSearchResults(null);
+  }
+
+  function pickerSelectNode(node: ClassificationNode) {
+    setSelectedClassifications(prev => ({ ...prev, [pickerSystemId!]: node.id }));
+    setSelectedLabels(prev => ({ ...prev, [pickerSystemId!]: `${node.code} — ${node.label}` }));
+    setPickerVisible(false);
+  }
+
+  function clearClassification(systemId: string) {
+    setSelectedClassifications(prev => ({ ...prev, [systemId]: null }));
+    setSelectedLabels(prev => { const n = { ...prev }; delete n[systemId]; return n; });
+  }
+
+  // --- Save ---
 
   async function handleSave() {
     if (!formData.title?.trim()) {
@@ -176,22 +202,29 @@ export default function AddBookScreen() {
         }
       }
 
-      insertBookCopy({
+      const copyId = insertBookCopy({
         recordId,
         copyNumber,
-        divisionId: selectedDivisionId,
+        divisionId: null,
         personalRating: null,
         notes: null,
         dateAdded: new Date().toISOString(),
       });
 
+      // Save classifications for each system
+      for (const [systemId, nodeId] of Object.entries(selectedClassifications)) {
+        if (nodeId) setBookCopyClassification(copyId, systemId, nodeId);
+      }
+
       router.back();
-    } catch (e) {
+    } catch {
       Alert.alert('Error', 'Failed to save the book. Please try again.');
     } finally {
       setLoading(false);
     }
   }
+
+  // --- Scan mode ---
 
   if (mode === 'scan') {
     if (!permission?.granted) {
@@ -234,6 +267,8 @@ export default function AddBookScreen() {
       </View>
     );
   }
+
+  // --- Search mode ---
 
   if (mode === 'search') {
     return (
@@ -300,6 +335,8 @@ export default function AddBookScreen() {
     );
   }
 
+  // --- Choose mode ---
+
   if (mode === 'choose') {
     return (
       <SafeAreaView style={styles.container}>
@@ -326,9 +363,7 @@ export default function AddBookScreen() {
     );
   }
 
-  const classLabel = selectedDivision
-    ? `${selectedMainClass?.code} › ${selectedSection?.code} › ${selectedDivision?.code} — ${selectedDivision?.name}`
-    : 'Unclassified';
+  // --- Manual / form mode ---
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -337,6 +372,7 @@ export default function AddBookScreen() {
           <Ionicons name="chevron-back" size={18} color={colors.primary} />
           <Text style={styles.backRowText}>Choose different method</Text>
         </TouchableOpacity>
+
         <View style={styles.isbnRow}>
           <TextInput
             style={[styles.input, { flex: 1 }]}
@@ -358,26 +394,46 @@ export default function AddBookScreen() {
         <TextInput style={styles.input} placeholder="Pages" value={formData.pageCount?.toString() ?? ''} onChangeText={(v) => setFormData((p) => ({ ...p, pageCount: parseInt(v) || null }))} keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
         <TextInput style={[styles.input, { minHeight: 80 }]} placeholder="Synopsis" value={formData.synopsis ?? ''} onChangeText={(v) => setFormData((p) => ({ ...p, synopsis: v }))} multiline placeholderTextColor={colors.textSecondary} />
 
-        <View style={styles.sectionLabel}><Text style={styles.sectionLabelText}>Classification</Text></View>
-        <View style={styles.classRow}>
-          <TouchableOpacity style={styles.classPicker} onPress={() => { setClassPickerLevel('main'); setClassPickerVisible(true); }}>
-            <Text style={[styles.classPickerText, !selectedDivision && { color: colors.textSecondary }]} numberOfLines={2}>{classLabel}</Text>
-            <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
-          {selectedDivision && (
-            <TouchableOpacity onPress={() => { setSelectedMainClass(null); setSelectedSection(null); setSelectedDivision(null); setSelectedDivisionId(null); }}>
-              <Ionicons name="close-circle" size={22} color={colors.textSecondary} />
-            </TouchableOpacity>
-          )}
-        </View>
+        {/* Classification section */}
+        {systems.length > 0 && (
+          <>
+            <View style={styles.sectionLabel}>
+              <Text style={styles.sectionLabelText}>Classification</Text>
+            </View>
+            {systems.map(system => {
+              const label = selectedLabels[system.id];
+              return (
+                <View key={system.id} style={styles.classRow}>
+                  <TouchableOpacity style={styles.classPicker} onPress={() => openPicker(system.id)}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.classSystem}>{system.name}</Text>
+                      <Text style={[styles.classPickerText, !label && { color: colors.textSecondary }]} numberOfLines={1}>
+                        {label ?? 'Unclassified — tap to assign'}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                  {label && (
+                    <TouchableOpacity onPress={() => clearClassification(system.id)} hitSlop={8}>
+                      <Ionicons name="close-circle" size={22} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+          </>
+        )}
+
+        {systems.length === 0 && (
+          <View style={styles.noSystemsHint}>
+            <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
+            <Text style={styles.noSystemsText}>Import classification systems in the Classify tab to assign them here.</Text>
+          </View>
+        )}
 
         <TouchableOpacity style={styles.claudeBtn} onPress={handleAskClaude} disabled={loading}>
           <Ionicons name="sparkles-outline" size={18} color={colors.primary} style={{ marginRight: spacing.xs }} />
           <Text style={styles.claudeBtnText}>Ask Claude to fill missing fields</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.claudeBtn} onPress={handleSuggestClassification} disabled={loading}>
-          <Ionicons name="sparkles-outline" size={18} color={colors.primary} style={{ marginRight: spacing.xs }} />
-          <Text style={styles.claudeBtnText}>Ask Claude to suggest classification</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={[styles.btn, { marginTop: spacing.lg }]} onPress={handleSave} disabled={loading}>
@@ -388,54 +444,63 @@ export default function AddBookScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      <Modal visible={classPickerVisible} animationType="slide" presentationStyle="pageSheet">
+      {/* Classification node picker modal */}
+      <Modal visible={pickerVisible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {classPickerLevel === 'main' ? 'Main Class' : classPickerLevel === 'section' ? 'Section' : 'Division'}
+            <TouchableOpacity onPress={() => pickerStack.length > 0 ? pickerGoBack() : setPickerVisible(false)} style={{ padding: spacing.xs }}>
+              <Ionicons name={pickerStack.length > 0 ? 'chevron-back' : 'close'} size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle} numberOfLines={1}>
+              {pickerStack.length > 0 ? pickerStack[pickerStack.length - 1].label : (systems.find(s => s.id === pickerSystemId)?.name ?? 'Classification')}
             </Text>
-            <TouchableOpacity onPress={() => setClassPickerVisible(false)}>
-              <Ionicons name="close" size={26} color={colors.text} />
+            <TouchableOpacity onPress={() => setPickerVisible(false)}>
+              <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
-          {classPickerLevel === 'main' && (
-            <FlatList
-              data={mainClasses}
-              keyExtractor={(m) => m.id}
-              renderItem={({ item: mc }) => (
-                <TouchableOpacity style={styles.pickerRow} onPress={() => { setSelectedMainClass(mc); setSections(getSectionsByMainClass(mc.id)); setClassPickerLevel('section'); }}>
-                  <Text style={styles.pickerCode}>{mc.code}</Text>
-                  <Text style={styles.pickerName}>{mc.name}</Text>
-                  <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-                </TouchableOpacity>
-              )}
+
+          <View style={styles.pickerSearchBar}>
+            <Ionicons name="search" size={16} color={colors.textSecondary} />
+            <TextInput
+              style={styles.pickerSearchInput}
+              placeholder="Search…"
+              placeholderTextColor={colors.textSecondary}
+              value={pickerSearch}
+              onChangeText={setPickerSearch}
             />
-          )}
-          {classPickerLevel === 'section' && (
-            <FlatList
-              data={sections}
-              keyExtractor={(s) => s.id}
-              renderItem={({ item: sec }) => (
-                <TouchableOpacity style={styles.pickerRow} onPress={() => { setSelectedSection(sec); setDivisions(getDivisionsBySection(sec.id)); setClassPickerLevel('division'); }}>
-                  <Text style={styles.pickerCode}>{sec.code}</Text>
-                  <Text style={styles.pickerName}>{sec.name}</Text>
-                  <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-                </TouchableOpacity>
-              )}
-            />
-          )}
-          {classPickerLevel === 'division' && (
-            <FlatList
-              data={divisions}
-              keyExtractor={(d) => d.id}
-              renderItem={({ item: div }) => (
-                <TouchableOpacity style={styles.pickerRow} onPress={() => { setSelectedDivision(div); setSelectedDivisionId(div.id); setClassPickerVisible(false); }}>
-                  <Text style={styles.pickerCode}>{div.code}</Text>
-                  <Text style={styles.pickerName}>{div.name}</Text>
-                </TouchableOpacity>
-              )}
-            />
-          )}
+            {pickerSearch ? (
+              <TouchableOpacity onPress={() => setPickerSearch('')}>
+                <Ionicons name="close-circle" size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          <FlatList
+            data={pickerSearchResults ?? pickerNodes}
+            keyExtractor={n => n.id}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => {
+              const kids = hasChildren(item.id);
+              return (
+                <View style={styles.pickerRow}>
+                  <TouchableOpacity style={styles.pickerSelectBtn} onPress={() => pickerSelectNode(item)}>
+                    <Text style={styles.pickerCode}>{item.code}</Text>
+                    <Text style={styles.pickerName} numberOfLines={2}>{item.label}</Text>
+                  </TouchableOpacity>
+                  {kids && !pickerSearchResults && (
+                    <TouchableOpacity onPress={() => pickerDrillInto(item)} style={styles.pickerDrillBtn}>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={{ alignItems: 'center', paddingTop: 60 }}>
+                <Text style={{ color: colors.textSecondary }}>No entries found.</Text>
+              </View>
+            }
+          />
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -456,7 +521,10 @@ const styles = StyleSheet.create({
   sectionLabelText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
   classRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   classPicker: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
-  classPickerText: { flex: 1, fontSize: 15, color: colors.text },
+  classSystem: { fontSize: 11, fontWeight: '600', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
+  classPickerText: { fontSize: 14, color: colors.text },
+  noSystemsHint: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, paddingVertical: spacing.sm },
+  noSystemsText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   claudeBtn: { flexDirection: 'row', alignItems: 'center', padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.primaryLight },
   claudeBtnText: { fontSize: 14, color: colors.primary, fontWeight: '500' },
   btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md, minWidth: 200 },
@@ -476,13 +544,17 @@ const styles = StyleSheet.create({
   searchResultCoverPlaceholder: { backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
   searchResultTitle: { fontSize: 14, fontWeight: '600', color: colors.text },
   searchResultAuthor: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  searchResultYear: { fontSize: 12, color: colors.textMuted ?? colors.textSecondary, marginTop: 2 },
+  searchResultYear: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   scanOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center', padding: spacing.xl, gap: spacing.md, backgroundColor: 'rgba(0,0,0,0.5)' },
   scanFrame: { position: 'absolute', top: '30%', alignSelf: 'center', width: 260, height: 120, borderWidth: 2, borderColor: '#fff', borderRadius: radius.md },
   scanHint: { color: '#fff', fontSize: 14, textAlign: 'center' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderColor: colors.border },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
-  pickerRow: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderColor: colors.border, gap: spacing.md },
-  pickerCode: { width: 52, fontSize: 13, fontWeight: '700', color: colors.primary },
-  pickerName: { flex: 1, fontSize: 16, color: colors.text },
+  modalTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: colors.text, textAlign: 'center', marginHorizontal: spacing.sm },
+  pickerSearchBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, margin: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  pickerSearchInput: { flex: 1, fontSize: 15, color: colors.text },
+  pickerRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: colors.border },
+  pickerSelectBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: spacing.md, gap: spacing.md },
+  pickerDrillBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.lg },
+  pickerCode: { width: 56, fontSize: 13, fontWeight: '700', color: colors.primary, flexShrink: 0 },
+  pickerName: { flex: 1, fontSize: 15, color: colors.text },
 });

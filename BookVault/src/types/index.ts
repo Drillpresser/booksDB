@@ -86,6 +86,23 @@ export interface LoanWithDetails extends Loan {
   isOverdue: boolean;
 }
 
+export interface ClassificationSystem {
+  id: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+}
+
+export interface ClassificationNode {
+  id: string;
+  systemId: string;
+  code: string;
+  label: string;
+  parentId: string | null;
+  depth: number;
+  sortOrder: number;
+}
+
 export type SortMode = 'classification' | 'author' | 'title' | 'dateAdded';
 
 export interface BookLookupResult {

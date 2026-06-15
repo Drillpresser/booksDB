@@ -28,7 +28,8 @@
     "react-native-url-polyfill": "^2.0.0",
     "@supabase/supabase-js": "^2.49.0",
     "expo-auth-session": "~6.0.3",
-    "expo-web-browser": "~14.0.2"
+    "expo-web-browser": "~14.0.2",
+    "expo-document-picker": "~13.0.3"
   },
   "devDependencies": {
     "@babel/core": "~7.29.0",
