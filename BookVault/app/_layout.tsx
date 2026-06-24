@@ -1,11 +1,23 @@
+import React, { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as SplashScreen from 'expo-splash-screen';
 import { colors } from '../src/theme';
-import { AuthProvider } from '../src/contexts/AuthContext';
+import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 
-export default function RootLayout() {
+SplashScreen.preventAutoHideAsync();
+
+function AppTabs() {
+  const { loading } = useAuth();
+
+  useEffect(() => {
+    if (loading) return;
+    // Auth is ready — keep splash visible for a beat then dismiss
+    const t = setTimeout(() => SplashScreen.hideAsync(), 1000);
+    return () => clearTimeout(t);
+  }, [loading]);
+
   return (
-    <AuthProvider>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -35,8 +47,15 @@ export default function RootLayout() {
       <Tabs.Screen
         name="contacts"
         options={{
-          title: 'Contacts',
+          title: 'Patrons',
           tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="shelves"
+        options={{
+          title: 'Shelves',
+          tabBarIcon: ({ color, size }) => <Ionicons name="albums-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -47,6 +66,13 @@ export default function RootLayout() {
         }}
       />
     </Tabs>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <AppTabs />
     </AuthProvider>
   );
 }

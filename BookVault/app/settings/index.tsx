@@ -146,7 +146,7 @@ export default function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
-          <Text style={styles.sectionDesc}>BookVault — Personal Library Catalog</Text>
+          <Text style={styles.sectionDesc}>BookHoarder — Personal Library Catalog</Text>
           <Text style={styles.hint}>Version 1.0.0</Text>
         </View>
       </ScrollView>
