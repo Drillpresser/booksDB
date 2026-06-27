@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image,
   StyleSheet, ActivityIndicator, Alert, Modal,
@@ -15,6 +15,7 @@ import {
   applyForCard, createBookRequest,
 } from '../../../src/services/library';
 import type { Library, LibraryBook, LibraryCard } from '../../../src/services/library';
+import { supabase } from '../../../src/lib/supabase';
 
 export default function LibraryViewScreen() {
   const { libraryId } = useLocalSearchParams<{ libraryId: string }>();
@@ -36,6 +37,19 @@ export default function LibraryViewScreen() {
 
   const isOwner = !!user && library?.ownerId === user.id;
   const isApproved = myCard?.status === 'approved';
+
+  useEffect(() => {
+    if (!libraryId || !user) return;
+    async function refreshCard() {
+      const card = await getMyCardForLibrary(libraryId!);
+      setMyCard(card);
+    }
+    const channel = supabase
+      .channel(`card-status-${libraryId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'library_cards', filter: `library_id=eq.${libraryId}` }, () => { refreshCard(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [libraryId, user?.id]);
 
   useFocusEffect(
     useCallback(() => {

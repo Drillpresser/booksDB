@@ -1,0 +1,17 @@
+name: PR Type Check
+
+on:
+  pull_request:
+    branches:
+      - "**"
+
+jobs:
+  typecheck:
+    name: TypeScript check
+    type: custom
+    runs_on: linux-medium
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: TypeScript check
+        run: npx tsc --noEmit

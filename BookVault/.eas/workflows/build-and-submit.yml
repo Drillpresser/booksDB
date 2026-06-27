@@ -1,0 +1,21 @@
+name: Build and Submit to TestFlight
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: iOS production build
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  submit:
+    name: Submit to TestFlight
+    type: submit
+    needs: [build]
+    params:
+      build_id: ${{ needs.build.outputs.build_id }}
