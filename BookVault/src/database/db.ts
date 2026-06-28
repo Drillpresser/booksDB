@@ -10,7 +10,13 @@ export function getDB(): SQLite.SQLiteDatabase {
   return _db;
 }
 
+const SCHEMA_VERSION = 1;
+
 function migrate(db: SQLite.SQLiteDatabase) {
+  const versionRow = db.getFirstSync('PRAGMA user_version') as any;
+  const currentVersion: number = versionRow?.user_version ?? 0;
+  if (currentVersion >= SCHEMA_VERSION) return;
+
   db.execSync(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
@@ -89,6 +95,8 @@ function migrate(db: SQLite.SQLiteDatabase) {
       FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
     );
   `);
+
+  db.runSync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
 export function generateId(): string {

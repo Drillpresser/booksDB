@@ -8,18 +8,33 @@
       "distribution": "internal",
       "ios": {
         "image": "macos-sequoia-15.6-xcode-26.2"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://xukrezkcuufoqkiwnkkj.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_gP8CV1N_XYBLYC2RzHYGug_XL1hc0RN",
+        "EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY": "AIzaSyBUcZK1up9hPbDtsZv5yTlxyvKQf3Mltaw"
       }
     },
     "preview": {
       "distribution": "internal",
       "ios": {
         "image": "macos-sequoia-15.6-xcode-26.2"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://xukrezkcuufoqkiwnkkj.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_gP8CV1N_XYBLYC2RzHYGug_XL1hc0RN",
+        "EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY": "AIzaSyBUcZK1up9hPbDtsZv5yTlxyvKQf3Mltaw"
       }
     },
     "production": {
       "autoIncrement": true,
       "ios": {
         "image": "macos-sequoia-15.6-xcode-26.2"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://xukrezkcuufoqkiwnkkj.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_gP8CV1N_XYBLYC2RzHYGug_XL1hc0RN",
+        "EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY": "AIzaSyBUcZK1up9hPbDtsZv5yTlxyvKQf3Mltaw"
       }
     }
   },

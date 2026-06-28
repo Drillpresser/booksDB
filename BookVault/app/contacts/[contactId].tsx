@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, TextInput, Image,
+  Alert, TextInput, Image, Share, ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
 import { getContactById, updateContact, deleteContact } from '../../src/database/queries/contacts';
 import { getLoanHistoryForContact } from '../../src/database/queries/loans';
+import { getMyLibraries, createInvite } from '../../src/services/library';
+import type { Library } from '../../src/services/library';
 import type { Contact, LoanWithDetails } from '../../src/types';
 
 export default function ContactDetailScreen() {
@@ -20,6 +22,8 @@ export default function ContactDetailScreen() {
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
+  const [myLibraries, setMyLibraries] = useState<Library[]>([]);
+  const [invitingLibraryId, setInvitingLibraryId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -32,6 +36,7 @@ export default function ContactDetailScreen() {
     const c = getContactById(contactId);
     setContact(c);
     setLoans(getLoanHistoryForContact(contactId));
+    getMyLibraries().then(setMyLibraries).catch(() => {});
   }
 
   function startEdit() {
@@ -53,14 +58,31 @@ export default function ContactDetailScreen() {
     setEditing(false);
   }
 
+  async function handleInviteToShelf(lib: Library) {
+    setInvitingLibraryId(lib.id);
+    try {
+      const inv = await createInvite(lib.id);
+      if (!inv?.inviteToken) throw new Error('No token');
+      const link = `bookvault://library/invite/${inv.inviteToken}`;
+      await Share.share({
+        message: `${contact?.name ?? 'You'} — you're invited to ${lib.name} on BookHoarder!\n\n${link}`,
+        title: `Invite to ${lib.name}`,
+      });
+    } catch {
+      Alert.alert('Error', 'Could not create invite link.');
+    } finally {
+      setInvitingLibraryId(null);
+    }
+  }
+
   function handleDelete() {
     if (!contact) return;
     const activeLoans = loans.filter((l) => !l.dateReturned);
     if (activeLoans.length > 0) {
-      Alert.alert('Cannot Delete', 'This contact currently has books on loan. Return them first.');
+      Alert.alert('Cannot Delete', 'This patron currently has books on loan. Return them first.');
       return;
     }
-    Alert.alert('Delete Contact', `Delete ${contact.name}? Their loan history will also be removed.`, [
+    Alert.alert('Delete Patron', `Delete ${contact.name}? Their loan history will also be removed.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -76,7 +98,7 @@ export default function ContactDetailScreen() {
   if (!contact) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.center}><Text style={styles.notFound}>Contact not found.</Text></View>
+        <View style={styles.center}><Text style={styles.notFound}>Patron not found.</Text></View>
       </SafeAreaView>
     );
   }
@@ -148,14 +170,40 @@ export default function ContactDetailScreen() {
 
         {loans.length === 0 && (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No loan history for this contact.</Text>
+            <Text style={styles.emptyText}>No loan history for this patron.</Text>
+          </View>
+        )}
+
+        {myLibraries.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Invite to Shelf</Text>
+            {myLibraries.map((lib) => (
+              <TouchableOpacity
+                key={lib.id}
+                style={styles.inviteRow}
+                onPress={() => handleInviteToShelf(lib)}
+                disabled={invitingLibraryId === lib.id}
+                activeOpacity={0.7}
+              >
+                <View style={styles.inviteRowIcon}>
+                  <Ionicons name="library" size={18} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inviteRowName}>{lib.name}</Text>
+                  <Text style={styles.inviteRowMeta}>{lib.isPublic ? 'Public' : 'Private'}</Text>
+                </View>
+                {invitingLibraryId === lib.id
+                  ? <ActivityIndicator size="small" color={colors.primary} />
+                  : <Ionicons name="share-outline" size={18} color={colors.primary} />}
+              </TouchableOpacity>
+            ))}
           </View>
         )}
 
         <View style={styles.section}>
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
             <Ionicons name="trash-outline" size={18} color={colors.danger} />
-            <Text style={styles.deleteBtnText}>Delete Contact</Text>
+            <Text style={styles.deleteBtnText}>Delete Patron</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -225,4 +273,8 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 14, color: colors.textSecondary },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, justifyContent: 'center', padding: spacing.md, borderWidth: 1, borderColor: colors.danger, borderRadius: radius.md },
   deleteBtnText: { color: colors.danger, fontWeight: '600' },
+  inviteRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, gap: spacing.sm },
+  inviteRowIcon: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
+  inviteRowName: { fontSize: 15, fontWeight: '600', color: colors.text },
+  inviteRowMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
 });

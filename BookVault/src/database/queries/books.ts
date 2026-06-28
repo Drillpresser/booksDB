@@ -13,9 +13,10 @@ async function ensureCoversDir() {
 
 export async function saveCoverImage(bookRecordId: string, imageUrl: string): Promise<string | null> {
   try {
+    const httpsUrl = imageUrl.replace(/^http:\/\//i, 'https://');
     await ensureCoversDir();
     const localUri = COVERS_DIR + bookRecordId + '.jpg';
-    const result = await FileSystem.downloadAsync(imageUrl, localUri);
+    const result = await FileSystem.downloadAsync(httpsUrl, localUri);
     return result.status === 200 ? result.uri : null;
   } catch {
     return null;
@@ -145,9 +146,9 @@ export function getCopyCountForRecord(recordId: string): number {
   return row?.count ?? 0;
 }
 
-export function insertBookRecord(data: Omit<BookRecord, 'id'>): string {
+export function insertBookRecord(data: Omit<BookRecord, 'id'>, presetId?: string): string {
   const db = getDB();
-  const id = generateId();
+  const id = presetId ?? generateId();
   db.runSync(
     `INSERT INTO book_records
       (id, title, authors, sort_author, isbn13, publisher, published_year, page_count,

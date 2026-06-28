@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
-  TextInput, Modal,
+  TextInput, Modal, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,22 +26,27 @@ export function CommunityRatings({ isbn, localRating, onLocalRating }: Props) {
   const [pendingStar, setPendingStar] = useState(0);
   const [reviewText, setReviewText] = useState('');
   const [saving, setSaving] = useState(false);
+  const loadSeqRef = useRef(0);
 
   useEffect(() => {
     load();
   }, [isbn, user?.id]);
 
   async function load() {
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     try {
       const data = await getRatingsForIsbn(isbn, user?.id);
+      if (seq !== loadSeqRef.current) return;
       setSummary(data);
       if (data.myRating) {
         setPendingStar(data.myRating.stars);
         setReviewText(data.myRating.review ?? '');
       }
+    } catch {
+      if (seq === loadSeqRef.current) setSummary(null);
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) setLoading(false);
     }
   }
 
@@ -62,6 +67,8 @@ export function CommunityRatings({ isbn, localRating, onLocalRating }: Props) {
       await upsertRating(isbn, pendingStar, reviewText.trim() || null, user.id);
       setReviewModalVisible(false);
       await load();
+    } catch {
+      Alert.alert('Error', 'Could not save your rating. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -76,6 +83,8 @@ export function CommunityRatings({ isbn, localRating, onLocalRating }: Props) {
       setReviewText('');
       setReviewModalVisible(false);
       await load();
+    } catch {
+      Alert.alert('Error', 'Could not remove your rating. Please try again.');
     } finally {
       setSaving(false);
     }

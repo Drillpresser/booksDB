@@ -8,10 +8,14 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
+import * as FileSystem from 'expo-file-system';
 import { lookupByIsbn, searchBooks, deriveSortAuthor } from '../../src/services/bookLookup';
 import { lookupBookWithClaude, fillMissingFields, suggestClassification, getApiKey } from '../../src/services/claude';
 import { insertBookRecord, insertBookCopy, saveCoverImage, getRecordByIsbn, getCopyCountForRecord } from '../../src/database/queries/books';
+import { generateId, getDB } from '../../src/database/db';
 import { getAllMainClasses, getSectionsByMainClass, getDivisionsBySection } from '../../src/database/queries/classifications';
+import { getMyLibraries, syncBookToLibraries } from '../../src/services/library';
+import type { Library } from '../../src/services/library';
 import type { BookLookupResult, MainClass, Section, Division } from '../../src/types';
 
 type AddMode = 'choose' | 'scan' | 'search' | 'manual';
@@ -37,9 +41,12 @@ export default function AddBookScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<BookLookupResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [myLibraries, setMyLibraries] = useState<Library[]>([]);
+  const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
 
   useEffect(() => {
     setMainClasses(getAllMainClasses());
+    getMyLibraries().then(setMyLibraries).catch(() => {});
   }, []);
 
   async function handleSearch() {
@@ -57,8 +64,10 @@ export default function AddBookScreen() {
 
   function handleSearchResultSelect(result: BookLookupResult) {
     setFormData({ ...result });
-    setIsbnInput(result.isbn13 ?? '');
+    const isbn = result.isbn13 ?? '';
+    setIsbnInput(isbn);
     setMode('manual');
+    if (isbn) handleIsbnLookup(isbn);
   }
 
   async function handleIsbnLookup(isbn: string) {
@@ -74,13 +83,21 @@ export default function AddBookScreen() {
       }
       if (result) {
         setFormData({ ...result });
-        if (!result.title && !result.authors?.length) {
+        if (result.language === 'non-en') {
+          Alert.alert(
+            'Non-English Edition',
+            'This ISBN appears to be a non-English edition. Review the details before saving.',
+          );
+        } else if (!result.title && !result.authors?.length) {
           Alert.alert('Not Found', 'No data found for this ISBN. You can fill in the details manually.');
         }
       } else {
         Alert.alert('Not Found', 'Could not find this book. Fill in the details manually.');
         setFormData({});
       }
+    } catch {
+      Alert.alert('Lookup Failed', 'Could not look up this ISBN. Enter details manually.');
+      setFormData({});
     } finally {
       setLoading(false);
     }
@@ -96,6 +113,8 @@ export default function AddBookScreen() {
     try {
       const filled = await fillMissingFields(formData);
       if (filled) setFormData((prev) => ({ ...prev, ...filled }));
+    } catch {
+      Alert.alert('Error', 'Claude could not fill in the fields. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -128,6 +147,8 @@ export default function AddBookScreen() {
         setSelectedMainClass(mc);
         setSelectedDivisionId(suggestion.divisionId);
       }
+    } catch {
+      Alert.alert('Error', 'Could not get a classification suggestion. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -141,22 +162,77 @@ export default function AddBookScreen() {
     setLoading(true);
     try {
       const isbn = isbnInput.trim() || null;
-      let recordId: string;
-      let copyNumber = 1;
+      const preId = generateId();
 
       const existingRecord = isbn ? getRecordByIsbn(isbn) : null;
-      if (existingRecord) {
-        recordId = existingRecord.id;
-        copyNumber = getCopyCountForRecord(recordId) + 1;
-      } else {
-        const authors = formData.authors ?? [];
-        let coverImage: string | null = null;
-        if (formData.coverUrl) {
-          const tmpId = Math.random().toString(36).slice(2);
-          coverImage = await saveCoverImage(tmpId, formData.coverUrl);
+
+      // Download cover before opening the transaction (async work must happen outside).
+      // Use preId as the filename so the file is already named for the record it will belong to.
+      let coverImage: string | null = null;
+      if (!existingRecord && formData.coverUrl) {
+        const httpsUrl = formData.coverUrl.replace(/^http:\/\//i, 'https://');
+        coverImage = await saveCoverImage(preId, httpsUrl) ?? httpsUrl;
+      }
+
+      let newCopyId = '';
+      let savedRecordId = '';
+      let savedCopyNumber = 1;
+
+      try {
+        getDB().withTransactionSync(() => {
+          let recordId: string;
+          let copyNumber = 1;
+
+          if (existingRecord) {
+            recordId = existingRecord.id;
+            copyNumber = getCopyCountForRecord(recordId) + 1;
+          } else {
+            const authors = formData.authors ?? [];
+            recordId = insertBookRecord(
+              {
+                title: formData.title!,
+                authors,
+                sortAuthor: deriveSortAuthor(authors),
+                isbn13: isbn,
+                publisher: formData.publisher ?? null,
+                publishedYear: formData.publishedYear ?? null,
+                pageCount: formData.pageCount ?? null,
+                synopsis: formData.synopsis ?? null,
+                coverImage,
+                deweyDecimal: formData.deweyDecimal ?? null,
+                communityRating: formData.communityRating ?? null,
+                communityRatingCount: formData.communityRatingCount ?? null,
+                communityRatingFetched: formData.communityRating ? new Date().toISOString() : null,
+              },
+              preId,
+            );
+          }
+
+          newCopyId = insertBookCopy({
+            recordId,
+            copyNumber,
+            divisionId: selectedDivisionId,
+            personalRating: null,
+            notes: null,
+            dateAdded: new Date().toISOString(),
+          });
+          savedRecordId = recordId;
+          savedCopyNumber = copyNumber;
+        });
+      } catch (e) {
+        // Transaction rolled back — clean up the downloaded cover file if any.
+        if (coverImage) {
+          FileSystem.deleteAsync(coverImage, { idempotent: true }).catch(() => {});
         }
-        recordId = insertBookRecord({
-          title: formData.title,
+        throw e;
+      }
+
+      if (selectedLibraryIds.length > 0 && newCopyId) {
+        const authors = formData.authors ?? [];
+        syncBookToLibraries(selectedLibraryIds, {
+          copyId: newCopyId,
+          recordId: savedRecordId,
+          title: formData.title!,
           authors,
           sortAuthor: deriveSortAuthor(authors),
           isbn13: isbn,
@@ -164,26 +240,18 @@ export default function AddBookScreen() {
           publishedYear: formData.publishedYear ?? null,
           pageCount: formData.pageCount ?? null,
           synopsis: formData.synopsis ?? null,
-          coverImage,
+          coverImage: formData.coverUrl ? formData.coverUrl.replace(/^http:\/\//i, 'https://') : null,
           deweyDecimal: formData.deweyDecimal ?? null,
-          communityRating: formData.communityRating ?? null,
-          communityRatingCount: formData.communityRatingCount ?? null,
-          communityRatingFetched: formData.communityRating ? new Date().toISOString() : null,
-        });
-        if (coverImage) {
-          const { updateBookRecord } = require('../../src/database/queries/books');
-          updateBookRecord(recordId, { coverImage });
-        }
+          copyNumber: savedCopyNumber,
+          divisionCode: selectedDivision?.code ?? null,
+          divisionName: selectedDivision?.name ?? null,
+          sectionCode: selectedSection?.code ?? null,
+          sectionName: selectedSection?.name ?? null,
+          mainClassCode: selectedMainClass?.code ?? null,
+          mainClassName: selectedMainClass?.name ?? null,
+          isOnLoan: false,
+        }).catch(() => {});
       }
-
-      insertBookCopy({
-        recordId,
-        copyNumber,
-        divisionId: selectedDivisionId,
-        personalRating: null,
-        notes: null,
-        dateAdded: new Date().toISOString(),
-      });
 
       router.back();
     } catch (e) {
@@ -337,19 +405,15 @@ export default function AddBookScreen() {
           <Ionicons name="chevron-back" size={18} color={colors.primary} />
           <Text style={styles.backRowText}>Choose different method</Text>
         </TouchableOpacity>
-        <View style={styles.isbnRow}>
-          <TextInput
-            style={[styles.input, { flex: 1 }]}
-            placeholder="ISBN"
-            value={isbnInput}
-            onChangeText={setIsbnInput}
-            keyboardType="numeric"
-            placeholderTextColor={colors.textSecondary}
-          />
-          <TouchableOpacity style={styles.lookupBtn} onPress={() => handleIsbnLookup(isbnInput)} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.lookupBtnText}>Look Up</Text>}
-          </TouchableOpacity>
-        </View>
+        <TextInput
+          style={styles.input}
+          placeholder="ISBN"
+          value={isbnInput}
+          onChangeText={setIsbnInput}
+          onEndEditing={() => { if (isbnInput.trim()) handleIsbnLookup(isbnInput.trim()); }}
+          keyboardType="numeric"
+          placeholderTextColor={colors.textSecondary}
+        />
 
         <TextInput style={styles.input} placeholder="Title *" value={formData.title ?? ''} onChangeText={(v) => setFormData((p) => ({ ...p, title: v }))} placeholderTextColor={colors.textSecondary} />
         <TextInput style={styles.input} placeholder="Author(s) — comma separated" value={(formData.authors ?? []).join(', ')} onChangeText={(v) => setFormData((p) => ({ ...p, authors: v.split(',').map((a) => a.trim()).filter(Boolean) }))} placeholderTextColor={colors.textSecondary} />
@@ -360,7 +424,7 @@ export default function AddBookScreen() {
 
         <View style={styles.sectionLabel}><Text style={styles.sectionLabelText}>Classification</Text></View>
         <View style={styles.classRow}>
-          <TouchableOpacity style={styles.classPicker} onPress={() => { setClassPickerLevel('main'); setClassPickerVisible(true); }}>
+          <TouchableOpacity style={styles.classPicker} onPress={() => { setClassPickerLevel('main'); setSections([]); setDivisions([]); setClassPickerVisible(true); }}>
             <Text style={[styles.classPickerText, !selectedDivision && { color: colors.textSecondary }]} numberOfLines={2}>{classLabel}</Text>
             <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -370,6 +434,36 @@ export default function AddBookScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {myLibraries.length > 0 && (
+          <>
+            <View style={styles.sectionLabel}><Text style={styles.sectionLabelText}>Add to Shelves</Text></View>
+            <View style={styles.libraryChips}>
+              {myLibraries.map((lib) => {
+                const selected = selectedLibraryIds.includes(lib.id);
+                return (
+                  <TouchableOpacity
+                    key={lib.id}
+                    style={[styles.libraryChip, selected && styles.libraryChipSelected]}
+                    onPress={() => setSelectedLibraryIds((prev) =>
+                      selected ? prev.filter((id) => id !== lib.id) : [...prev, lib.id]
+                    )}
+                  >
+                    <Ionicons
+                      name={selected ? 'checkmark-circle' : 'library-outline'}
+                      size={14}
+                      color={selected ? '#fff' : colors.primary}
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text style={[styles.libraryChipText, selected && styles.libraryChipTextSelected]}>
+                      {lib.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
 
         <TouchableOpacity style={styles.claudeBtn} onPress={handleAskClaude} disabled={loading}>
           <Ionicons name="sparkles-outline" size={18} color={colors.primary} style={{ marginRight: spacing.xs }} />
@@ -449,14 +543,16 @@ const styles = StyleSheet.create({
   permText: { fontSize: 16, color: colors.text, textAlign: 'center', marginBottom: spacing.md },
   form: { padding: spacing.md, gap: spacing.sm },
   input: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, fontSize: 16, color: colors.text },
-  isbnRow: { flexDirection: 'row', gap: spacing.sm },
-  lookupBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: spacing.md, justifyContent: 'center' },
-  lookupBtnText: { color: '#fff', fontWeight: '700' },
   sectionLabel: { marginTop: spacing.sm },
   sectionLabelText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
   classRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   classPicker: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   classPickerText: { flex: 1, fontSize: 15, color: colors.text },
+  libraryChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  libraryChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  libraryChipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  libraryChipText: { fontSize: 13, color: colors.primary, fontWeight: '500' },
+  libraryChipTextSelected: { color: '#fff' },
   claudeBtn: { flexDirection: 'row', alignItems: 'center', padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.primaryLight },
   claudeBtnText: { fontSize: 14, color: colors.primary, fontWeight: '500' },
   btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md, minWidth: 200 },

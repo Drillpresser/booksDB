@@ -76,8 +76,8 @@ export default function ContactsScreen() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="people-outline" size={64} color={colors.border} />
-            <Text style={styles.emptyTitle}>No contacts yet</Text>
-            <Text style={styles.emptySubtitle}>Contacts are created when you lend a book, or you can add them here.</Text>
+            <Text style={styles.emptyTitle}>No patrons yet</Text>
+            <Text style={styles.emptySubtitle}>Patrons are created when you lend a book, or you can add them here.</Text>
           </View>
         }
       />
@@ -85,7 +85,7 @@ export default function ContactsScreen() {
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>New Contact</Text>
+            <Text style={styles.modalTitle}>New Patron</Text>
             <TouchableOpacity onPress={() => setModalVisible(false)}>
               <Ionicons name="close" size={26} color={colors.text} />
             </TouchableOpacity>
@@ -95,7 +95,7 @@ export default function ContactsScreen() {
             <TextInput style={styles.input} placeholder="Phone (optional)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholderTextColor={colors.textSecondary} />
             <TextInput style={styles.input} placeholder="Email (optional)" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholderTextColor={colors.textSecondary} />
             <TouchableOpacity style={styles.saveBtn} onPress={handleAdd}>
-              <Text style={styles.saveBtnText}>Add Contact</Text>
+              <Text style={styles.saveBtnText}>Add Patron</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>

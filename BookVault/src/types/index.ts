@@ -100,4 +100,6 @@ export interface BookLookupResult {
   communityRating: number | null;
   communityRatingCount: number | null;
   isbn13?: string | null;
+  /** 'en' = confirmed English, 'non-en' = confirmed non-English, null = unknown */
+  language?: 'en' | 'non-en' | null;
 }

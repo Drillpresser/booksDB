@@ -31,7 +31,7 @@ export function AuthSheet({ visible, onClose }: Props) {
 
         <View style={styles.body}>
           <Ionicons name="star" size={52} color={colors.accent} />
-          <Text style={styles.title}>Join BookVault</Text>
+          <Text style={styles.title}>Join BookHoarder</Text>
           <Text style={styles.subtitle}>
             Sign in to rate books and see what other readers think.
           </Text>

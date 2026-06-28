@@ -5,6 +5,11 @@
     "owner": "drillpress",
     "version": "1.0.0",
     "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FAF3E0"
+    },
     "orientation": "portrait",
     "scheme": "bookvault",
     "userInterfaceStyle": "dark",
@@ -16,18 +21,19 @@
         "UIDesignRequiresCompatibility": true,
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "2"
+      "buildNumber": "8"
     },
     "plugins": [
       "expo-router",
       [
         "expo-camera",
         {
-          "cameraPermission": "BookVault uses your camera to scan book barcodes."
+          "cameraPermission": "BookHoarder uses your camera to scan book barcodes."
         }
       ],
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "router": {},

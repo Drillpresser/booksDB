@@ -17,6 +17,7 @@ export default function SettingsLayout() {
     <Stack screenOptions={{ ...headerOptions }}>
       <Stack.Screen name="index" options={{ title: 'Settings', ...backButton }} />
       <Stack.Screen name="classifications" options={{ title: 'Manage Classifications', ...backButton }} />
+      <Stack.Screen name="library" options={{ headerShown: false }} />
     </Stack>
   );
 }

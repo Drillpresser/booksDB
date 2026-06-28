@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  StyleSheet, Alert, TextInput, Modal, FlatList,
+  StyleSheet, Alert, TextInput, Modal, FlatList, Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,6 +12,11 @@ import { CommunityRatings } from '../../src/components/CommunityRatings';
 import { getCopyById, updateBookCopy, deleteBookCopy } from '../../src/database/queries/books';
 import { getLoanHistoryForCopy, createLoan, returnLoan } from '../../src/database/queries/loans';
 import { getAllContacts, createContact } from '../../src/database/queries/contacts';
+import {
+  updateBookLoanStatus, getMyLibraries, getLibraryIdsForCopy,
+  upsertBookInLibrary, removeBookFromLibrary,
+} from '../../src/services/library';
+import type { Library } from '../../src/services/library';
 import type { BookCopyWithDetails, LoanWithDetails, Contact } from '../../src/types';
 
 export default function BookDetailScreen() {
@@ -22,10 +28,13 @@ export default function BookDetailScreen() {
   const [lendModalVisible, setLendModalVisible] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-  const [expectedReturn, setExpectedReturn] = useState('');
+  const [returnDate, setReturnDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [loanNotes, setLoanNotes] = useState('');
   const [newContactName, setNewContactName] = useState('');
   const [showNewContact, setShowNewContact] = useState(false);
+  const [myLibraries, setMyLibraries] = useState<Library[]>([]);
+  const [memberLibraryIds, setMemberLibraryIds] = useState<string[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -35,9 +44,15 @@ export default function BookDetailScreen() {
 
   function loadData() {
     if (!copyId) return;
-    const data = getCopyById(copyId);
-    setBook(data);
-    setLoanHistory(getLoanHistoryForCopy(copyId));
+    try {
+      const data = getCopyById(copyId);
+      setBook(data);
+      setLoanHistory(getLoanHistoryForCopy(copyId));
+    } catch {
+      // SQLite error — leave book null, screen shows "not found"
+    }
+    getMyLibraries().then(setMyLibraries).catch(() => {});
+    getLibraryIdsForCopy(copyId).then(setMemberLibraryIds).catch(() => {});
   }
 
   function handleRating(star: number) {
@@ -56,6 +71,7 @@ export default function BookDetailScreen() {
         onPress: () => {
           returnLoan(book.currentLoan!.id, new Date().toISOString());
           loadData();
+          updateBookLoanStatus(book.id, false).catch(() => {});
         },
       },
     ]);
@@ -64,7 +80,8 @@ export default function BookDetailScreen() {
   function handleLend() {
     setContacts(getAllContacts());
     setSelectedContact(null);
-    setExpectedReturn('');
+    setReturnDate(null);
+    setShowDatePicker(false);
     setLoanNotes('');
     setShowNewContact(false);
     setNewContactName('');
@@ -88,10 +105,48 @@ export default function BookDetailScreen() {
       return;
     }
 
-    const returnDate = expectedReturn.trim() || null;
-    createLoan(book.id, contactId, new Date().toISOString(), returnDate, loanNotes.trim() || null);
+    const returnIso = returnDate ? returnDate.toISOString().split('T')[0] : null;
+    createLoan(book.id, contactId, new Date().toISOString(), returnIso, loanNotes.trim() || null);
     setLendModalVisible(false);
     loadData();
+    updateBookLoanStatus(book.id, true).catch(() => {});
+  }
+
+  async function handleLibraryToggle(lib: Library) {
+    if (!book) return;
+    const inLibrary = memberLibraryIds.includes(lib.id);
+    if (inLibrary) {
+      await removeBookFromLibrary(lib.id, book.id).catch(() => {});
+      setMemberLibraryIds((prev) => prev.filter((id) => id !== lib.id));
+    } else {
+      const isbn = book.record.isbn13;
+      const coverImage = isbn
+        ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`
+        : null;
+      await upsertBookInLibrary(lib.id, {
+        copyId: book.id,
+        recordId: book.record.id,
+        title: book.record.title,
+        authors: book.record.authors,
+        sortAuthor: book.record.sortAuthor,
+        isbn13: isbn,
+        publisher: book.record.publisher,
+        publishedYear: book.record.publishedYear,
+        pageCount: book.record.pageCount,
+        synopsis: book.record.synopsis,
+        coverImage,
+        deweyDecimal: book.record.deweyDecimal,
+        copyNumber: book.copyNumber,
+        divisionCode: book.division?.code ?? null,
+        divisionName: book.division?.name ?? null,
+        sectionCode: book.section?.code ?? null,
+        sectionName: book.section?.name ?? null,
+        mainClassCode: book.mainClass?.code ?? null,
+        mainClassName: book.mainClass?.name ?? null,
+        isOnLoan: book.isOnLoan,
+      }).catch(() => {});
+      setMemberLibraryIds((prev) => [...prev, lib.id]);
+    }
   }
 
   function handleDelete() {
@@ -106,8 +161,12 @@ export default function BookDetailScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
-          deleteBookCopy(book.id);
-          router.back();
+          try {
+            deleteBookCopy(book.id);
+            router.back();
+          } catch {
+            Alert.alert('Error', 'Could not delete this copy. Please try again.');
+          }
         },
       },
     ]);
@@ -227,6 +286,34 @@ export default function BookDetailScreen() {
           </View>
         )}
 
+        {myLibraries.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Shelves</Text>
+            <View style={styles.libraryChips}>
+              {myLibraries.map((lib) => {
+                const inLibrary = memberLibraryIds.includes(lib.id);
+                return (
+                  <TouchableOpacity
+                    key={lib.id}
+                    style={[styles.libraryChip, inLibrary && styles.libraryChipActive]}
+                    onPress={() => handleLibraryToggle(lib)}
+                  >
+                    <Ionicons
+                      name={inLibrary ? 'checkmark-circle' : 'library-outline'}
+                      size={14}
+                      color={inLibrary ? '#fff' : colors.primary}
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text style={[styles.libraryChipText, inLibrary && styles.libraryChipTextActive]}>
+                      {lib.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         <View style={styles.section}>
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
             <Ionicons name="trash-outline" size={18} color={colors.danger} />
@@ -261,15 +348,43 @@ export default function BookDetailScreen() {
               ListFooterComponent={
                 <TouchableOpacity style={[styles.contactRow, showNewContact && styles.contactRowSelected]} onPress={() => { setShowNewContact(true); setSelectedContact(null); }}>
                   <Ionicons name="person-add-outline" size={18} color={colors.primary} style={{ marginRight: spacing.sm }} />
-                  <Text style={[styles.contactName, { color: colors.primary }]}>New Contact</Text>
+                  <Text style={[styles.contactName, { color: colors.primary }]}>New Patron</Text>
                 </TouchableOpacity>
               }
             />
             {showNewContact && (
               <TextInput style={styles.modalInput} placeholder="Contact name" value={newContactName} onChangeText={setNewContactName} autoFocus placeholderTextColor={colors.textSecondary} />
             )}
-            <Text style={styles.fieldLabel}>Expected Return Date (optional, YYYY-MM-DD)</Text>
-            <TextInput style={styles.modalInput} placeholder="e.g. 2026-08-01" value={expectedReturn} onChangeText={setExpectedReturn} placeholderTextColor={colors.textSecondary} />
+            <Text style={styles.fieldLabel}>Expected Return Date (optional)</Text>
+            <TouchableOpacity
+              style={styles.dateTrigger}
+              onPress={() => setShowDatePicker((v) => !v)}
+            >
+              <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+              <Text style={[styles.dateTriggerText, !returnDate && { color: colors.textSecondary }]}>
+                {returnDate
+                  ? returnDate.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+                  : 'No return date set'}
+              </Text>
+              {returnDate && (
+                <TouchableOpacity onPress={() => { setReturnDate(null); setShowDatePicker(false); }}>
+                  <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={returnDate ?? new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                minimumDate={new Date()}
+                textColor={colors.text}
+                onChange={(_event, date) => {
+                  if (Platform.OS === 'android') setShowDatePicker(false);
+                  if (date) setReturnDate(date);
+                }}
+              />
+            )}
             <Text style={styles.fieldLabel}>Notes (optional)</Text>
             <TextInput style={[styles.modalInput, { minHeight: 60 }]} placeholder="Any notes..." value={loanNotes} onChangeText={setLoanNotes} multiline placeholderTextColor={colors.textSecondary} />
             <TouchableOpacity style={styles.lendBtn} onPress={confirmLend}>
@@ -330,4 +445,11 @@ const styles = StyleSheet.create({
   contactRow: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, marginBottom: spacing.xs, borderWidth: 1, borderColor: colors.border },
   contactRowSelected: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   contactName: { flex: 1, fontSize: 16, color: colors.text },
+  dateTrigger: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
+  dateTriggerText: { flex: 1, fontSize: 15, color: colors.text },
+  libraryChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  libraryChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  libraryChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  libraryChipText: { fontSize: 13, color: colors.primary, fontWeight: '500' },
+  libraryChipTextActive: { color: '#fff' },
 });

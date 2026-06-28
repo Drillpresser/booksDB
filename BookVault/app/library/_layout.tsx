@@ -18,6 +18,9 @@ export default function LibraryLayout() {
       <Stack.Screen name="index" options={{ title: 'Library', ...backButton }} />
       <Stack.Screen name="add" options={{ title: 'Add Book', presentation: 'modal', ...backButton }} />
       <Stack.Screen name="[copyId]" options={{ title: 'Book Detail', ...backButton }} />
+      <Stack.Screen name="browse" options={{ title: 'Browse Shelves', ...backButton }} />
+      <Stack.Screen name="view" options={{ headerShown: false }} />
+      <Stack.Screen name="invite" options={{ headerShown: false }} />
     </Stack>
   );
 }

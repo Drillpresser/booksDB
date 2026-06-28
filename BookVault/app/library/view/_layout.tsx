@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { HeaderBackButton } from '../../src/components/HeaderBackButton';
+import { HeaderBackButton } from '../../../src/components/HeaderBackButton';
 
 const headerOptions = {
   headerStyle: { backgroundColor: '#1A0800' },
@@ -12,11 +12,10 @@ const headerOptions = {
 
 const backButton = { headerLeft: ({ canGoBack }: { canGoBack?: boolean }) => <HeaderBackButton canGoBack={canGoBack} /> };
 
-export default function ContactsLayout() {
+export default function ViewLayout() {
   return (
-    <Stack screenOptions={{ ...headerOptions }}>
-      <Stack.Screen name="index" options={{ title: 'Patrons', ...backButton }} />
-      <Stack.Screen name="[contactId]" options={{ title: 'Patron', ...backButton }} />
+    <Stack screenOptions={headerOptions}>
+      <Stack.Screen name="[libraryId]" options={{ title: 'Shelf', ...backButton }} />
     </Stack>
   );
 }
