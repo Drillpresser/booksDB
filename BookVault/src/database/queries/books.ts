@@ -239,6 +239,20 @@ export function deleteBookCopy(copyId: string) {
   }
 }
 
+export function getRecordCopySummary(recordId: string): { total: number; available: number } {
+  const db = getDB();
+  const rows = db.getAllSync(
+    `SELECT bc.id,
+            (SELECT COUNT(*) FROM loans l WHERE l.copy_id = bc.id AND l.date_returned IS NULL) AS on_loan
+     FROM book_copies bc WHERE bc.record_id = ?`,
+    [recordId]
+  ) as any[];
+  return {
+    total: rows.length,
+    available: rows.filter((r) => r.on_loan === 0).length,
+  };
+}
+
 export function searchCopies(query: string): BookCopyWithDetails[] {
   const db = getDB();
   const like = `%${query}%`;
@@ -261,6 +275,10 @@ function getCurrentLoanForCopy(copyId: string): LoanWithContact | null {
     [copyId]
   ) as any;
   if (!row) return null;
+  const now = new Date();
+  const isOverdue = row.expected_return
+    ? new Date(row.expected_return) < now
+    : new Date(new Date(row.date_lent).getTime() + 90 * 86400000) < now;
   return {
     id: row.id,
     copyId: row.copy_id,
@@ -269,6 +287,7 @@ function getCurrentLoanForCopy(copyId: string): LoanWithContact | null {
     expectedReturn: row.expected_return,
     dateReturned: row.date_returned,
     notes: row.notes,
-    contact: { id: row.c_id, name: row.c_name, phone: row.c_phone, email: row.c_email, notes: row.c_notes },
+    contact: { id: row.c_id, name: row.c_name, phone: row.c_phone, email: row.c_email, notes: row.c_notes, color: row.c_color ?? null },
+    isOverdue,
   };
 }

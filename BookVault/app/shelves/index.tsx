@@ -1,27 +1,59 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, ScrollView, Switch, ActivityIndicator,
+  View, Text, ScrollView, TouchableOpacity, TextInput,
+  StyleSheet, Alert, Modal, Image, ActivityIndicator, Switch,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { getMyLibraries, createLibrary, updateLibrary } from '../../src/services/library';
-import type { Library } from '../../src/services/library';
+import { getMyLibraries, getBooksInLibrary, createLibrary } from '../../src/services/library';
+import type { Library, LibraryBook } from '../../src/services/library';
+
+type ShelfWithBooks = { library: Library; books: LibraryBook[] };
+
+const COVER_W = 67;
+const COVER_H = 98;
+
+// Deterministic cover background color from title
+const SPINE_COLORS = ['#4C703E', '#C5612A', '#2D4A2B', '#7A5C3E', '#3B5998', '#6B4C8A'];
+function spineColor(title: string): string {
+  let h = 0;
+  for (let i = 0; i < title.length; i++) h = ((h << 5) - h + title.charCodeAt(i)) | 0;
+  return SPINE_COLORS[Math.abs(h) % SPINE_COLORS.length];
+}
+
+function BookCover({ book, onPress }: { book: LibraryBook; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.coverWrap} onPress={onPress} activeOpacity={0.75}>
+      {book.coverImage ? (
+        <Image source={{ uri: book.coverImage }} style={styles.cover} resizeMode="cover" />
+      ) : (
+        <View style={[styles.cover, { backgroundColor: spineColor(book.title) }]}>
+          <View style={styles.spineAccent} />
+          <Text style={styles.spineTitleText} numberOfLines={4}>{book.title}</Text>
+        </View>
+      )}
+      {book.isOnLoan && (
+        <View style={styles.outBadge}>
+          <Text style={styles.outBadgeText}>OUT</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
 
 export default function MyShelvesScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const [libraries, setLibraries] = useState<Library[]>([]);
+  const [shelves, setShelves] = useState<ShelfWithBooks[]>([]);
   const [loading, setLoading] = useState(true);
   const [createVisible, setCreateVisible] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newPublic, setNewPublic] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [bulkToggling, setBulkToggling] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -33,26 +65,21 @@ export default function MyShelvesScreen() {
   async function load() {
     setLoading(true);
     try {
-      const data = await getMyLibraries();
-      setLibraries(data);
+      const libs = await getMyLibraries();
+      const booksResults = await Promise.all(libs.map((lib) => getBooksInLibrary(lib.id)));
+      setShelves(libs.map((lib, i) => ({ library: lib, books: booksResults[i] })));
     } catch {
-      setLibraries([]);
+      setShelves([]);
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleBulkToggle(makePublic: boolean) {
-    if (libraries.length === 0) return;
-    setBulkToggling(true);
-    try {
-      await Promise.all(libraries.map((lib) => updateLibrary(lib.id, { isPublic: makePublic })));
-      await load();
-    } catch {
-      Alert.alert('Error', 'Could not update all shelves.');
-    } finally {
-      setBulkToggling(false);
-    }
+  function openCreate() {
+    setNewName('');
+    setNewDesc('');
+    setNewPublic(true);
+    setCreateVisible(true);
   }
 
   async function handleCreate() {
@@ -62,12 +89,8 @@ export default function MyShelvesScreen() {
     }
     setSaving(true);
     try {
-      const lib = await createLibrary(newName.trim(), newDesc.trim() || null, newPublic);
-      if (!lib) throw new Error('Failed');
+      await createLibrary(newName.trim(), newDesc.trim() || null, newPublic);
       setCreateVisible(false);
-      setNewName('');
-      setNewDesc('');
-      setNewPublic(true);
       await load();
     } catch {
       Alert.alert('Error', 'Could not create shelf. Please try again.');
@@ -90,97 +113,119 @@ export default function MyShelvesScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={[]}>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Shelves</Text>
+        <TouchableOpacity onPress={openCreate} style={{ padding: spacing.xs }}>
+          <Ionicons name="add-circle-outline" size={26} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
+
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={colors.primary} size="large" /></View>
+      ) : shelves.length === 0 ? (
+        <View style={styles.center}>
+          <Ionicons name="library-outline" size={64} color={colors.border} />
+          <Text style={styles.emptyTitle}>No shelves yet</Text>
+          <Text style={styles.emptySubtitle}>Create your first shelf to share your collection.</Text>
+          <TouchableOpacity style={styles.createBigBtn} onPress={openCreate}>
+            <Ionicons name="add" size={18} color="#fff" />
+            <Text style={styles.createBigBtnText}>New Shelf</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
-        <FlatList
-          data={libraries}
-          keyExtractor={(l) => l.id}
-          contentContainerStyle={{ padding: spacing.md, gap: spacing.sm }}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.row}
-              onPress={() => router.push(`/shelves/${item.id}`)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.rowIcon}>
-                <Ionicons name="library" size={22} color={colors.primary} />
-              </View>
-              <View style={styles.rowInfo}>
-                <Text style={styles.rowName}>{item.name}</Text>
-                {item.description ? (
-                  <Text style={styles.rowDesc} numberOfLines={1}>{item.description}</Text>
-                ) : null}
-                <Text style={styles.rowMeta}>{item.isPublic ? 'Public' : 'Private'}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-            </TouchableOpacity>
-          )}
-          ListHeaderComponent={libraries.length > 1 ? (
-            <View style={styles.bulkRow}>
-              <Text style={styles.bulkLabel}>All Shelves</Text>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.sectionDivider}>
+            <Text style={styles.sectionDividerLabel}>My Shelves</Text>
+            <View style={styles.sectionDividerLine} />
+          </View>
+          {shelves.map(({ library, books }) => (
+            <View key={library.id} style={styles.shelfSection}>
               <TouchableOpacity
-                style={[styles.bulkBtn, bulkToggling && { opacity: 0.5 }]}
-                onPress={() => handleBulkToggle(true)}
-                disabled={bulkToggling}
+                style={styles.shelfHeader}
+                onPress={() => router.push(`/shelves/${library.id}`)}
+                activeOpacity={0.7}
               >
-                <Text style={styles.bulkBtnText}>Make All Public</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.shelfName}>{library.name}</Text>
+                  <Text style={styles.shelfMeta}>
+                    {books.length} {books.length === 1 ? 'book' : 'books'}
+                    {' · '}
+                    {library.isPublic ? 'Public' : 'Private'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.borderDark} />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.bulkBtn, bulkToggling && { opacity: 0.5 }]}
-                onPress={() => handleBulkToggle(false)}
-                disabled={bulkToggling}
-              >
-                <Text style={styles.bulkBtnText}>Make All Private</Text>
-              </TouchableOpacity>
+
+              {books.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.rail}
+                >
+                  {books.map((book) => (
+                    <BookCover
+                      key={book.id}
+                      book={book}
+                      onPress={() => router.push(`/library/${book.copyId}`)}
+                    />
+                  ))}
+                </ScrollView>
+              ) : (
+                <View style={styles.emptyRail}>
+                  <Ionicons name="book-outline" size={22} color={colors.border} />
+                  <Text style={styles.emptyRailText}>Add books from the Library tab</Text>
+                </View>
+              )}
             </View>
-          ) : null}
-          ListEmptyComponent={
-            <View style={styles.center}>
-              <Ionicons name="library-outline" size={64} color={colors.border} />
-              <Text style={styles.emptyTitle}>No shelves yet</Text>
-              <Text style={styles.emptySubtitle}>Create your first shelf to share your collection.</Text>
-            </View>
-          }
-          ListFooterComponent={
-            <TouchableOpacity style={styles.createBtn} onPress={() => setCreateVisible(true)}>
-              <Ionicons name="add" size={20} color="#fff" />
-              <Text style={styles.createBtnText}>New Shelf</Text>
-            </TouchableOpacity>
-          }
-        />
+          ))}
+
+          <TouchableOpacity style={styles.newShelfRow} onPress={openCreate}>
+            <Ionicons name="add" size={18} color={colors.primary} />
+            <Text style={styles.newShelfRowText}>New Shelf</Text>
+          </TouchableOpacity>
+        </ScrollView>
       )}
 
+      {/* Create shelf modal */}
       <Modal visible={createVisible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setCreateVisible(false)}>
+              <Text style={styles.modalAction}>Cancel</Text>
+            </TouchableOpacity>
             <Text style={styles.modalTitle}>New Shelf</Text>
-            <TouchableOpacity onPress={() => { setCreateVisible(false); setNewName(''); setNewDesc(''); setNewPublic(true); }}>
-              <Ionicons name="close" size={26} color={colors.text} />
+            <TouchableOpacity onPress={handleCreate}>
+              <Text style={[styles.modalAction, { color: colors.primaryDark, fontWeight: '700' }]}>Save</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}>
-            <Text style={styles.fieldLabel}>Shelf Name *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Favorites, Science Fiction, Lendables..."
-              value={newName}
-              onChangeText={setNewName}
-              autoFocus
-              placeholderTextColor={colors.textSecondary}
-            />
-            <Text style={styles.fieldLabel}>Description (optional)</Text>
-            <TextInput
-              style={[styles.input, { minHeight: 70 }]}
-              placeholder="A short description of your shelf..."
-              value={newDesc}
-              onChangeText={setNewDesc}
-              multiline
-              placeholderTextColor={colors.textSecondary}
-            />
-            <View style={styles.switchRow}>
+          <ScrollView contentContainerStyle={styles.modalForm}>
+            <View style={styles.fieldCard}>
+              <Text style={styles.fieldLabel}>Shelf Name</Text>
+              <TextInput
+                style={styles.fieldInput}
+                placeholder="e.g. Favorites, Science Fiction, Lendables…"
+                value={newName}
+                onChangeText={setNewName}
+                autoFocus
+                placeholderTextColor={colors.textMuted}
+              />
+            </View>
+            <View style={styles.fieldCard}>
+              <Text style={styles.fieldLabel}>
+                Description <Text style={styles.optional}>· optional</Text>
+              </Text>
+              <TextInput
+                style={[styles.fieldInput, { minHeight: 60 }]}
+                placeholder="A short description of your shelf…"
+                value={newDesc}
+                onChangeText={setNewDesc}
+                multiline
+                placeholderTextColor={colors.textMuted}
+              />
+            </View>
+            <View style={[styles.fieldCard, { flexDirection: 'row', alignItems: 'center' }]}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.switchLabel}>Public Shelf</Text>
+                <Text style={styles.fieldLabel}>Public Shelf</Text>
                 <Text style={styles.switchHint}>Anyone can browse and apply for a card</Text>
               </View>
               <Switch
@@ -191,13 +236,13 @@ export default function MyShelvesScreen() {
               />
             </View>
             <TouchableOpacity
-              style={[styles.primaryBtn, saving && { opacity: 0.6 }]}
+              style={[styles.saveBtn, saving && { opacity: 0.6 }]}
               onPress={handleCreate}
               disabled={saving}
             >
               {saving
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.primaryBtnText}>Create Shelf</Text>}
+                : <Text style={styles.saveBtnText}>Create Shelf</Text>}
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
@@ -211,25 +256,47 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: colors.text, marginTop: spacing.md, textAlign: 'center' },
   emptySubtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.sm, textAlign: 'center', lineHeight: 20 },
-  row: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
-  rowIcon: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
-  rowInfo: { flex: 1 },
-  rowName: { fontSize: 16, fontWeight: '700', color: colors.text },
-  rowDesc: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  rowMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  createBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md },
-  createBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderColor: colors.border },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
-  fieldLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, fontSize: 15, color: colors.text },
-  switchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
-  switchLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
+  headerRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: 6, paddingBottom: 4 },
+  title: { fontSize: 34, fontWeight: '600', color: colors.text, letterSpacing: -0.3, fontFamily: 'Georgia' },
+
+  scrollContent: { paddingBottom: spacing.xl },
+
+  shelfSection: { marginBottom: spacing.lg },
+  shelfHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  sectionDivider: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: spacing.md, paddingTop: 11, paddingBottom: 4 },
+  sectionDividerLabel: { fontFamily: 'Courier', fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.primaryDark },
+  sectionDividerLine: { flex: 1, height: 1, backgroundColor: colors.borderCard },
+  shelfName: { fontSize: 17, fontWeight: '600', color: colors.text, fontFamily: 'Georgia' },
+  shelfMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+
+  rail: { paddingHorizontal: spacing.md, gap: spacing.sm, paddingBottom: spacing.xs },
+
+  coverWrap: { position: 'relative' },
+  cover: { width: COVER_W, height: COVER_H, borderRadius: 6, overflow: 'hidden' },
+  spineAccent: { position: 'absolute', left: 6, top: 0, bottom: 0, width: 1.5, backgroundColor: 'rgba(255,255,255,0.25)' },
+  spineTitleText: { position: 'absolute', inset: 0, padding: 7, paddingLeft: 12, fontSize: 9, fontWeight: '600', color: 'rgba(255,255,255,0.85)', lineHeight: 12 },
+  outBadge: { position: 'absolute', top: 5, right: 5, backgroundColor: colors.onLoan, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
+  outBadgeText: { color: '#fff', fontSize: 8, fontWeight: '800', letterSpacing: 0.3 },
+
+  emptyRail: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: spacing.md, paddingHorizontal: spacing.md, paddingVertical: 18, backgroundColor: colors.surfaceAlt, borderRadius: 12, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed' },
+  emptyRailText: { fontSize: 13, color: colors.textMuted },
+
+  newShelfRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginHorizontal: spacing.md, paddingVertical: 14, borderWidth: 1, borderColor: colors.primary, borderRadius: 12 },
+  newShelfRowText: { color: colors.primary, fontWeight: '600', fontSize: 15 },
+
+  createBigBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, marginTop: spacing.lg },
+  createBigBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+  // Modal
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, paddingHorizontal: spacing.lg, borderBottomWidth: 1, borderColor: colors.border },
+  modalAction: { fontSize: 16, color: colors.primary },
+  modalTitle: { fontSize: 16, fontWeight: '600', color: colors.text },
+  modalForm: { padding: spacing.md, gap: spacing.sm },
+  fieldCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 13 },
+  fieldLabel: { fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 },
+  fieldInput: { fontSize: 15, color: colors.text, marginTop: 3, padding: 0 },
+  optional: { textTransform: 'none', letterSpacing: 0, color: colors.borderDark },
   switchHint: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  primaryBtn: { backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md, alignItems: 'center' },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  bulkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm, flexWrap: 'wrap' },
-  bulkLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, flex: 1 },
-  bulkBtn: { borderWidth: 1, borderColor: colors.primary, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
-  bulkBtnText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
+  saveBtn: { backgroundColor: colors.primary, borderRadius: 11, padding: 14, alignItems: 'center', marginTop: spacing.sm },
+  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });

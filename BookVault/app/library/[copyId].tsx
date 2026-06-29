@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  StyleSheet, Alert, TextInput, Modal, FlatList, Platform,
+  StyleSheet, Alert, TextInput, Modal, FlatList, Platform, StatusBar,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
 import { CommunityRatings } from '../../src/components/CommunityRatings';
-import { getCopyById, updateBookCopy, deleteBookCopy } from '../../src/database/queries/books';
+import { getCopyById, updateBookCopy, deleteBookCopy, getRecordCopySummary } from '../../src/database/queries/books';
 import { getLoanHistoryForCopy, createLoan, returnLoan } from '../../src/database/queries/loans';
 import { getAllContacts, createContact } from '../../src/database/queries/contacts';
 import {
@@ -35,6 +35,7 @@ export default function BookDetailScreen() {
   const [showNewContact, setShowNewContact] = useState(false);
   const [myLibraries, setMyLibraries] = useState<Library[]>([]);
   const [memberLibraryIds, setMemberLibraryIds] = useState<string[]>([]);
+  const [copySummary, setCopySummary] = useState<{ total: number; available: number } | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -48,6 +49,7 @@ export default function BookDetailScreen() {
       const data = getCopyById(copyId);
       setBook(data);
       setLoanHistory(getLoanHistoryForCopy(copyId));
+      if (data) setCopySummary(getRecordCopySummary(data.recordId));
     } catch {
       // SQLite error — leave book null, screen shows "not found"
     }
@@ -97,7 +99,7 @@ export default function BookDetailScreen() {
         Alert.alert('Name Required', 'Enter a name for the new contact.');
         return;
       }
-      contactId = createContact({ name: newContactName.trim(), phone: null, email: null, notes: null });
+      contactId = createContact({ name: newContactName.trim(), phone: null, email: null, notes: null, color: null });
     }
 
     if (!contactId) {
@@ -181,6 +183,7 @@ export default function BookDetailScreen() {
   }
 
   const pastLoans = loanHistory.filter((l) => l.dateReturned !== null);
+  const coverBg = spineColor(book.record.title);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -189,8 +192,9 @@ export default function BookDetailScreen() {
           {book.record.coverImage ? (
             <Image source={{ uri: book.record.coverImage }} style={styles.cover} />
           ) : (
-            <View style={[styles.cover, styles.coverPlaceholder]}>
-              <Ionicons name="book-outline" size={48} color={colors.border} />
+            <View style={[styles.cover, { backgroundColor: coverBg }]}>
+              <View style={styles.coverInsetBorder} />
+              <Text style={styles.coverPlaceholderTitle} numberOfLines={5}>{book.record.title}</Text>
             </View>
           )}
           <View style={styles.heroInfo}>
@@ -210,6 +214,33 @@ export default function BookDetailScreen() {
             <Text style={styles.classText} numberOfLines={2}>
               {book.mainClass?.code} {book.mainClass?.name} › {book.section?.code} {book.section?.name} › {book.division.code} {book.division.name}
             </Text>
+          </View>
+        )}
+
+        {copySummary && copySummary.total > 1 && (
+          <View style={[
+            styles.availBanner,
+            copySummary.available === 0 ? styles.availBannerOut : styles.availBannerOk,
+          ]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[
+                styles.availBannerText,
+                { color: copySummary.available === 0 ? colors.danger : colors.accentDark },
+              ]}>
+                {copySummary.available === 0
+                  ? 'All copies out on loan'
+                  : `${copySummary.available} cop${copySummary.available === 1 ? 'y' : 'ies'} available`}
+              </Text>
+            </View>
+            <View style={styles.dotsRow}>
+              {Array.from({ length: copySummary.total }).map((_, i) => (
+                <View
+                  key={i}
+                  style={[styles.dot, { backgroundColor: i < (copySummary.total - copySummary.available) ? colors.danger : colors.success }]}
+                />
+              ))}
+            </View>
+            <Text style={styles.dotLabel}>{copySummary.total - copySummary.available} of {copySummary.total} out</Text>
           </View>
         )}
 
@@ -402,21 +433,36 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+const SPINE_COLORS = ['#4C703E', '#C5612A', '#2D4A2B', '#7A5C3E', '#3B5998', '#6B4C8A'];
+function spineColor(title: string): string {
+  let h = 0;
+  for (let i = 0; i < title.length; i++) h = ((h << 5) - h + title.charCodeAt(i)) | 0;
+  return SPINE_COLORS[Math.abs(h) % SPINE_COLORS.length];
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   notFound: { fontSize: 16, color: colors.textSecondary },
   scroll: { padding: spacing.md, gap: spacing.md },
   heroRow: { flexDirection: 'row', gap: spacing.md },
-  cover: { width: 90, height: 128, borderRadius: radius.md },
-  coverPlaceholder: { backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
+  cover: { width: 92, height: 132, borderRadius: 8, overflow: 'hidden', position: 'relative', justifyContent: 'center', alignItems: 'center', padding: 10 },
+  coverInsetBorder: { position: 'absolute', top: 6, left: 6, right: 6, bottom: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', borderRadius: 3 },
+  coverPlaceholderTitle: { fontFamily: 'Georgia', fontWeight: '600', fontSize: 12, lineHeight: 16, color: 'rgba(250,243,224,0.96)', textAlign: 'center' },
   heroInfo: { flex: 1, gap: spacing.xs },
-  title: { fontSize: 18, fontWeight: '700', color: colors.text },
+  title: { fontSize: 21, fontWeight: '700', color: colors.text, fontFamily: 'Georgia', lineHeight: 26 },
   authors: { fontSize: 14, color: colors.textSecondary },
   meta: { fontSize: 13, color: colors.textSecondary },
   copyLabel: { fontSize: 12, color: colors.primary, fontWeight: '600' },
   classCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.primaryLight, borderRadius: radius.md, padding: spacing.md },
   classText: { flex: 1, fontSize: 13, color: colors.primary },
+  availBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, paddingHorizontal: 13, paddingVertical: 10, borderWidth: 1 },
+  availBannerOk: { backgroundColor: '#EAF0DA', borderColor: '#CADBA8' },
+  availBannerOut: { backgroundColor: '#FBE6E2', borderColor: '#EBC4BD' },
+  availBannerText: { fontSize: 13, fontWeight: '600' },
+  dotsRow: { flexDirection: 'row', gap: 3 },
+  dot: { width: 9, height: 9, borderRadius: 5 },
+  dotLabel: { fontFamily: 'Courier', fontSize: 11, color: colors.textMuted },
   loanCard: { backgroundColor: '#FFF8E1', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.onLoan, gap: spacing.xs },
   loanCardOverdue: { backgroundColor: '#FFEBEE', borderColor: colors.danger },
   loanCardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
@@ -428,7 +474,7 @@ const styles = StyleSheet.create({
   lendBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md },
   lendBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   section: { gap: spacing.sm },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, fontFamily: 'Georgia' },
   starsRow: { flexDirection: 'row', gap: spacing.sm },
   communityRating: { fontSize: 13, color: colors.textSecondary },
   synopsis: { fontSize: 14, color: colors.text, lineHeight: 21 },

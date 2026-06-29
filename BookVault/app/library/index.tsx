@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Image,
 } from 'react-native';
-import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
@@ -24,23 +24,36 @@ export default function LibraryScreen() {
     }, [sortMode])
   );
 
+  // Per-record availability map: recordId → { total, available }
+  const availabilityMap = useMemo(() => {
+    const map = new Map<string, { total: number; available: number }>();
+    for (const b of books) {
+      const rec = map.get(b.recordId) ?? { total: 0, available: 0 };
+      rec.total++;
+      if (!b.isOnLoan) rec.available++;
+      map.set(b.recordId, rec);
+    }
+    return map;
+  }, [books]);
+
   const displayedBooks = useMemo(() => {
     if (searchQuery.trim()) return searchCopies(searchQuery);
     return books;
   }, [searchQuery, books]);
 
   return (
-    <SafeAreaView style={styles.container} edges={[]}>
-      <Stack.Screen options={{ headerRight: () => (
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity onPress={() => router.push('/library/browse')} style={{ padding: spacing.xs, marginRight: spacing.xs }}>
-            <Ionicons name="earth-outline" size={24} color="#FFFFFF" />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.headerRow}>
+        <Text style={styles.heading}>Library</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, paddingBottom: 5 }}>
+          <TouchableOpacity onPress={() => router.push('/library/browse')} hitSlop={8}>
+            <Ionicons name="earth-outline" size={23} color={colors.accentDark} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/library/add')} style={{ padding: spacing.xs }}>
-            <Ionicons name="add" size={28} color="#FFFFFF" />
+          <TouchableOpacity onPress={() => router.push('/library/add')} hitSlop={8}>
+            <Ionicons name="add" size={27} color={colors.primary} />
           </TouchableOpacity>
         </View>
-      )}} />
+      </View>
 
       <View style={styles.searchBar}>
         <Ionicons name="search" size={18} color={colors.textSecondary} style={{ marginRight: spacing.sm }} />
@@ -73,6 +86,7 @@ export default function LibraryScreen() {
               </Text>
             </TouchableOpacity>
           ))}
+          <Text style={styles.volCount}>{books.length} vols</Text>
         </View>
       )}
 
@@ -80,7 +94,11 @@ export default function LibraryScreen() {
         data={displayedBooks}
         keyExtractor={(b) => b.id}
         renderItem={({ item }) => (
-          <BookRow book={item} onPress={() => router.push(`/library/${item.id}`)} />
+          <BookRow
+            book={item}
+            availability={availabilityMap.get(item.recordId) ?? { total: 1, available: item.isOnLoan ? 0 : 1 }}
+            onPress={() => router.push(`/library/${item.id}`)}
+          />
         )}
         ListEmptyComponent={
           <View style={styles.emptyState}>
@@ -103,35 +121,60 @@ export default function LibraryScreen() {
   );
 }
 
-function BookRow({ book, onPress }: { book: BookCopyWithDetails; onPress: () => void }) {
+function StarRating({ rating }: { rating: number | null }) {
+  if (!rating) return null;
+  const filled = Math.round(rating);
+  return (
+    <Text style={{ fontSize: 11, letterSpacing: 1 }}>
+      <Text style={{ color: colors.stars }}>{'★'.repeat(filled)}</Text>
+      <Text style={{ color: colors.border }}>{'★'.repeat(5 - filled)}</Text>
+    </Text>
+  );
+}
+
+function availBadge(avail: { total: number; available: number }, isOnLoan: boolean): { label: string; bg: string; color: string } | null {
+  const { total, available } = avail;
+  if (total === 1) {
+    // single copy — simple OUT badge
+    return isOnLoan ? { label: 'OUT', bg: colors.onLoan, color: '#fff' } : null;
+  }
+  // multi-copy book
+  if (available === 0) return { label: 'ALL OUT', bg: colors.danger, color: '#fff' };
+  if (available < total) return { label: `${available}/${total} avail`, bg: '#FCEAD2', color: colors.primaryDark };
+  return null; // all available — no badge needed
+}
+
+function BookRow({ book, availability, onPress }: { book: BookCopyWithDetails; availability: { total: number; available: number }; onPress: () => void }) {
+  const callCode = book.division
+    ? `${book.mainClass?.code ?? ''} ${book.record.sortAuthor?.slice(0, 3).toUpperCase() ?? ''}`.trim()
+    : null;
+
+  const badge = availBadge(availability, book.isOnLoan);
+
   return (
     <TouchableOpacity style={styles.bookRow} onPress={onPress} activeOpacity={0.7}>
       {book.record.coverImage ? (
         <Image source={{ uri: book.record.coverImage }} style={styles.cover} />
       ) : (
         <View style={[styles.cover, styles.coverPlaceholder]}>
-          <Ionicons name="book-outline" size={28} color={colors.border} />
+          <View style={styles.spineAccent} />
         </View>
       )}
       <View style={styles.bookInfo}>
-        <Text style={styles.bookTitle} numberOfLines={2}>{book.record.title}</Text>
+        <Text style={styles.bookTitle} numberOfLines={1}>{book.record.title}</Text>
         <Text style={styles.bookAuthor} numberOfLines={1}>{book.record.authors.join(', ')}</Text>
-        {book.division && (
-          <Text style={styles.bookClass} numberOfLines={1}>
-            {book.mainClass?.code} › {book.section?.code} › {book.division.code}
-          </Text>
-        )}
-        {book.copyNumber > 1 && (
-          <Text style={styles.copyBadge}>Copy {book.copyNumber}</Text>
-        )}
+        <View style={styles.bookChips}>
+          {callCode && <Text style={styles.callChip}>{callCode}</Text>}
+          <StarRating rating={book.personalRating} />
+        </View>
       </View>
       <View style={styles.bookMeta}>
-        {book.isOnLoan && (
-          <View style={styles.loanBadge}>
-            <Text style={styles.loanBadgeText}>Out</Text>
+        {badge && (
+          <View style={[styles.loanBadge, { backgroundColor: badge.bg }]}>
+            <Text style={[styles.loanBadgeText, { color: badge.color }]}>{badge.label}</Text>
           </View>
         )}
-        <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+        <Ionicons name="chevron-forward" size={18} color={colors.borderDark} />
       </View>
     </TouchableOpacity>
   );
@@ -139,6 +182,8 @@ function BookRow({ book, onPress }: { book: BookCopyWithDetails; onPress: () => 
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  headerRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: 6, paddingBottom: 4 },
+  heading: { fontSize: 34, fontWeight: '600', color: colors.text, letterSpacing: -0.3, fontFamily: 'Georgia' },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, margin: spacing.md, marginBottom: spacing.sm, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.border },
   searchInput: { flex: 1, fontSize: 16, color: colors.text },
   sortRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm },
@@ -147,17 +192,19 @@ const styles = StyleSheet.create({
   sortChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   sortChipText: { fontSize: 13, color: colors.textSecondary },
   sortChipTextActive: { color: '#fff', fontWeight: '600' },
-  bookRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, marginHorizontal: spacing.md, marginBottom: spacing.sm, borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.border },
-  cover: { width: 50, height: 72, borderRadius: radius.sm, marginRight: spacing.md },
-  coverPlaceholder: { backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
-  bookInfo: { flex: 1 },
-  bookTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
+  volCount: { flex: 1, textAlign: 'right', fontSize: 12, color: colors.textMuted, fontFamily: 'Courier' },
+  bookRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.surfaceCard, marginHorizontal: spacing.md, marginBottom: spacing.sm, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: colors.borderCard },
+  cover: { width: 44, height: 64, borderRadius: 4, flexShrink: 0 },
+  coverPlaceholder: { backgroundColor: colors.surfaceAlt, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  spineAccent: { position: 'absolute', left: 5, top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(255,255,255,0.4)' },
+  bookInfo: { flex: 1, minWidth: 0 },
+  bookTitle: { fontSize: 16, fontWeight: '600', color: colors.text, lineHeight: 19, fontFamily: 'Georgia' },
   bookAuthor: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  bookClass: { fontSize: 11, color: colors.primary, marginTop: 4 },
-  copyBadge: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
-  bookMeta: { alignItems: 'flex-end', gap: spacing.xs },
-  loanBadge: { backgroundColor: colors.onLoan, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 2 },
-  loanBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  bookChips: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 6 },
+  callChip: { fontSize: 10, letterSpacing: 0.3, color: colors.textMuted, backgroundColor: colors.surfaceAlt, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, fontFamily: 'Courier' },
+  bookMeta: { alignItems: 'flex-end', gap: spacing.xs, flexShrink: 0 },
+  loanBadge: { backgroundColor: colors.onLoan, borderRadius: 5, paddingHorizontal: spacing.sm, paddingVertical: 2 },
+  loanBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
   emptyState: { alignItems: 'center', paddingTop: 80, paddingHorizontal: spacing.xl },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: colors.text, marginTop: spacing.md },
   emptySubtitle: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },

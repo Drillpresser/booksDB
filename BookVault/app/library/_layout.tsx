@@ -1,24 +1,22 @@
 import { Stack } from 'expo-router';
-import { HeaderBackButton } from '../../src/components/HeaderBackButton';
+import { colors } from '../../src/theme';
 
 const headerOptions = {
-  headerStyle: { backgroundColor: '#1A0800' },
-  headerTintColor: '#DAA520',
-  headerTitleStyle: { fontWeight: '700' as const, color: '#FFFFFF' },
+  headerStyle: { backgroundColor: colors.background },
+  headerTintColor: colors.primary,
+  headerTitleStyle: { fontWeight: '600' as const, color: colors.text },
   headerTitleAlign: 'center' as const,
-  headerShadowVisible: true,
+  headerShadowVisible: false,
   headerBackTitle: '',
 };
-
-const backButton = { headerLeft: ({ canGoBack }: { canGoBack?: boolean }) => <HeaderBackButton canGoBack={canGoBack} /> };
 
 export default function LibraryLayout() {
   return (
     <Stack screenOptions={{ ...headerOptions }}>
-      <Stack.Screen name="index" options={{ title: 'Library', ...backButton }} />
-      <Stack.Screen name="add" options={{ title: 'Add Book', presentation: 'modal', ...backButton }} />
-      <Stack.Screen name="[copyId]" options={{ title: 'Book Detail', ...backButton }} />
-      <Stack.Screen name="browse" options={{ title: 'Browse Shelves', ...backButton }} />
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="add" options={{ title: 'Add Book', presentation: 'modal' }} />
+      <Stack.Screen name="[copyId]" options={{ title: '' }} />
+      <Stack.Screen name="browse" options={{ title: 'Browse Shelves' }} />
       <Stack.Screen name="view" options={{ headerShown: false }} />
       <Stack.Screen name="invite" options={{ headerShown: false }} />
     </Stack>

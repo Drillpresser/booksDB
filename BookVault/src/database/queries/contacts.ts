@@ -8,6 +8,7 @@ function rowToContact(row: any): Contact {
     phone: row.phone,
     email: row.email,
     notes: row.notes,
+    color: row.color ?? null,
   };
 }
 
@@ -27,8 +28,8 @@ export function createContact(data: Omit<Contact, 'id'>): string {
   const db = getDB();
   const id = generateId();
   db.runSync(
-    'INSERT INTO contacts (id, name, phone, email, notes) VALUES (?, ?, ?, ?, ?)',
-    [id, data.name, data.phone, data.email, data.notes]
+    'INSERT INTO contacts (id, name, phone, email, notes, color) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, data.name, data.phone, data.email, data.notes, data.color ?? null]
   );
   return id;
 }
@@ -40,6 +41,7 @@ export function updateContact(id: string, data: Partial<Omit<Contact, 'id'>>) {
     ['phone', data.phone],
     ['email', data.email],
     ['notes', data.notes],
+    ['color', data.color],
   ];
   for (const [col, val] of fields) {
     if (val !== undefined) {
@@ -60,4 +62,32 @@ export function getActiveLoansCountForContact(contactId: string): number {
     [contactId]
   ) as any;
   return row?.count ?? 0;
+}
+
+export interface ContactLoanStatus {
+  activeCount: number;
+  hasOverdue: boolean;
+  hasDueSoon: boolean;
+}
+
+export function getContactLoanStatus(contactId: string): ContactLoanStatus {
+  const db = getDB();
+  const rows = db.getAllSync(
+    'SELECT date_lent, expected_return FROM loans WHERE contact_id = ? AND date_returned IS NULL',
+    [contactId]
+  ) as any[];
+  const now = Date.now();
+  let hasOverdue = false;
+  let hasDueSoon = false;
+  for (const r of rows) {
+    if (r.expected_return) {
+      const due = new Date(r.expected_return).getTime();
+      if (due < now) hasOverdue = true;
+      else if (due - now < 3 * 86400000) hasDueSoon = true;
+    } else {
+      const lentMs = new Date(r.date_lent).getTime();
+      if (now - lentMs > 90 * 86400000) hasOverdue = true;
+    }
+  }
+  return { activeCount: rows.length, hasOverdue, hasDueSoon };
 }

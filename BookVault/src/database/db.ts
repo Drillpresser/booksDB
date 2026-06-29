@@ -10,13 +10,14 @@ export function getDB(): SQLite.SQLiteDatabase {
   return _db;
 }
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 function migrate(db: SQLite.SQLiteDatabase) {
   const versionRow = db.getFirstSync('PRAGMA user_version') as any;
   const currentVersion: number = versionRow?.user_version ?? 0;
   if (currentVersion >= SCHEMA_VERSION) return;
 
+  if (currentVersion < 1) {
   db.execSync(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
@@ -96,7 +97,13 @@ function migrate(db: SQLite.SQLiteDatabase) {
     );
   `);
 
-  db.runSync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  db.runSync(`PRAGMA user_version = 1`);
+  }
+
+  if (currentVersion < 2) {
+    db.execSync(`ALTER TABLE contacts ADD COLUMN color TEXT`);
+    db.runSync(`PRAGMA user_version = 2`);
+  }
 }
 
 export function generateId(): string {

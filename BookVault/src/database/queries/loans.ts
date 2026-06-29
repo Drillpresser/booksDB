@@ -39,7 +39,7 @@ function rowToDetail(row: any): LoanWithDetails {
   };
   return {
     ...loan,
-    contact: { id: row.c_id, name: row.c_name, phone: row.c_phone, email: row.c_email, notes: row.c_notes },
+    contact: { id: row.c_id, name: row.c_name, phone: row.c_phone, email: row.c_email, notes: row.c_notes, color: row.c_color ?? null },
     bookRecord: {
       id: row.br_id,
       title: row.title,
@@ -114,6 +114,14 @@ export function createLoan(
 export function returnLoan(loanId: string, dateReturned: string) {
   const db = getDB();
   db.runSync('UPDATE loans SET date_returned = ? WHERE id = ?', [dateReturned, loanId]);
+}
+
+export function getAllReturnedLoans(): LoanWithDetails[] {
+  const db = getDB();
+  const rows = db.getAllSync(
+    `${LOAN_DETAIL_QUERY} WHERE l.date_returned IS NOT NULL ORDER BY l.date_returned DESC`
+  ) as any[];
+  return rows.map(rowToDetail);
 }
 
 export function getOverdueCount(): number {

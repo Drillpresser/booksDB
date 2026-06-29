@@ -55,6 +55,9 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={[]}>
+      <View style={styles.headerRow}>
+        <Text style={styles.heading}>Settings</Text>
+      </View>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Claude AI</Text>
@@ -158,9 +161,11 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  headerRow: { paddingHorizontal: 22, paddingTop: 6, paddingBottom: 4 },
+  heading: { fontSize: 34, fontWeight: '600', color: colors.text, letterSpacing: -0.3, fontFamily: 'Georgia' },
   scroll: { padding: spacing.md, gap: spacing.md },
   section: { gap: spacing.md },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
+  sectionTitle: { fontSize: 11, fontWeight: '600', color: colors.primaryDark, textTransform: 'uppercase', letterSpacing: 1.4, fontFamily: 'Courier' },
   sectionDesc: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
   keyStatus: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   keyStatusText: { fontSize: 14, color: colors.success, fontWeight: '600' },
@@ -173,15 +178,15 @@ const styles = StyleSheet.create({
   removeBtn: { borderWidth: 1, borderColor: colors.danger, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg },
   removeBtnText: { color: colors.danger, fontWeight: '700' },
   hint: { fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
-  accountRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
-  accountAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
-  accountAvatarText: { color: colors.primary, fontWeight: '700', fontSize: 18 },
+  accountRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surfaceCard, borderRadius: 14, padding: spacing.md, borderWidth: 1, borderColor: colors.borderCard },
+  accountAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: colors.text, justifyContent: 'center', alignItems: 'center' },
+  accountAvatarText: { color: 'rgba(250,243,224,0.96)', fontWeight: '600', fontSize: 18, fontFamily: 'Georgia' },
   accountEmail: { fontSize: 14, color: colors.text },
   signOutBtn: { borderWidth: 1, borderColor: colors.danger, borderRadius: radius.md, paddingVertical: spacing.xs, paddingHorizontal: spacing.md },
   signOutBtnText: { color: colors.danger, fontWeight: '600', fontSize: 14 },
   signInBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, alignSelf: 'flex-start' },
   signInBtnText: { color: '#fff', fontWeight: '700' },
   divider: { height: 1, backgroundColor: colors.border },
-  navRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
+  navRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surfaceCard, borderRadius: 14, padding: spacing.md, borderWidth: 1, borderColor: colors.borderCard },
   navRowText: { flex: 1, fontSize: 16, color: colors.text },
 });

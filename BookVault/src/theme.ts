@@ -26,6 +26,9 @@ export const colors = {
 
   border: '#D4C09A',         // warm tan
   borderDark: '#B8A07A',     // deeper tan — emphasis borders
+  borderCard: '#E0CFA6',     // lighter tan — card borders
+
+  surfaceCard: '#F6EFDB',    // lightest parchment — card backgrounds
 
   onLoan: '#E77D36',         // jaffa
   overdue: '#B04040',        // muted red

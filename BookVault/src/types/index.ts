@@ -63,6 +63,7 @@ export interface Contact {
   phone: string | null;
   email: string | null;
   notes: string | null;
+  color: string | null;
 }
 
 export interface Loan {
@@ -77,6 +78,7 @@ export interface Loan {
 
 export interface LoanWithContact extends Loan {
   contact: Contact;
+  isOverdue: boolean;
 }
 
 export interface LoanWithDetails extends Loan {
