@@ -145,6 +145,49 @@ export async function getLibraryById(id: string): Promise<Library | null> {
   return data ? toLibrary(data) : null;
 }
 
+export async function getFollowedLibraries(): Promise<LibraryWithMeta[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: cards } = await supabase
+    .from('library_cards')
+    .select('library_id')
+    .eq('user_id', user.id)
+    .eq('status', 'approved');
+
+  if (!cards?.length) return [];
+
+  const libIds = (cards as any[]).map((c) => c.library_id);
+
+  const { data: libs } = await supabase
+    .from('libraries')
+    .select('*')
+    .in('id', libIds)
+    .neq('owner_id', user.id);
+
+  if (!libs?.length) return [];
+
+  const ownerIds = [...new Set((libs as any[]).map((l) => l.owner_id))];
+
+  const [profileRes, bookRes] = await Promise.all([
+    supabase.from('profiles').select('id, display_name').in('id', ownerIds),
+    supabase.from('library_books').select('library_id').in('library_id', libIds),
+  ]);
+
+  const profileMap: Record<string, string> = {};
+  ((profileRes.data as any[]) ?? []).forEach((p: any) => { profileMap[p.id] = p.display_name ?? 'Reader'; });
+
+  const countMap: Record<string, number> = {};
+  ((bookRes.data as any[]) ?? []).forEach((r: any) => { countMap[r.library_id] = (countMap[r.library_id] ?? 0) + 1; });
+
+  return (libs as any[]).map((l): LibraryWithMeta => ({
+    ...toLibrary(l),
+    ownerDisplayName: profileMap[l.owner_id] ?? 'Reader',
+    bookCount: countMap[l.id] ?? 0,
+    myCardStatus: 'approved',
+  }));
+}
+
 // ── Browse ─────────────────────────────────────────────────────────────────
 
 export async function getPublicLibraries(search?: string): Promise<LibraryWithMeta[]> {

@@ -263,7 +263,12 @@ export default function BookDetailScreen() {
           </View>
         )}
 
-        {!book.isOnLoan && (
+        {book.isOnLoan ? (
+          <View style={styles.lendBtnDisabled}>
+            <Ionicons name="time-outline" size={20} color={colors.textMuted} />
+            <Text style={styles.lendBtnDisabledText}>Unavailable to Lend</Text>
+          </View>
+        ) : (
           <TouchableOpacity style={styles.lendBtn} onPress={handleLend}>
             <Ionicons name="swap-horizontal-outline" size={20} color="#fff" />
             <Text style={styles.lendBtnText}>Lend This Book</Text>
@@ -471,8 +476,10 @@ const styles = StyleSheet.create({
   loanDetailBold: { fontWeight: '700' },
   returnBtn: { marginTop: spacing.sm, backgroundColor: colors.success, borderRadius: radius.md, padding: spacing.sm, alignItems: 'center' },
   returnBtnText: { color: '#fff', fontWeight: '700' },
-  lendBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md },
+  lendBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, borderRadius: 11, padding: 13 },
   lendBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  lendBtnDisabled: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.surfaceAlt, borderRadius: 11, padding: 13, borderWidth: 1, borderColor: colors.border },
+  lendBtnDisabledText: { color: colors.textMuted, fontSize: 16, fontWeight: '700' },
   section: { gap: spacing.sm },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, fontFamily: 'Georgia' },
   starsRow: { flexDirection: 'row', gap: spacing.sm },

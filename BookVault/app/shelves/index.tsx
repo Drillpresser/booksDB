@@ -8,10 +8,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { getMyLibraries, getBooksInLibrary, createLibrary } from '../../src/services/library';
-import type { Library, LibraryBook } from '../../src/services/library';
+import { getMyLibraries, getBooksInLibrary, createLibrary, getFollowedLibraries } from '../../src/services/library';
+import type { Library, LibraryBook, LibraryWithMeta } from '../../src/services/library';
 
 type ShelfWithBooks = { library: Library; books: LibraryBook[] };
+type FollowedShelfWithBooks = { library: LibraryWithMeta; books: LibraryBook[] };
 
 const COVER_W = 67;
 const COVER_H = 98;
@@ -48,6 +49,7 @@ export default function MyShelvesScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [shelves, setShelves] = useState<ShelfWithBooks[]>([]);
+  const [followedShelves, setFollowedShelves] = useState<FollowedShelfWithBooks[]>([]);
   const [loading, setLoading] = useState(true);
   const [createVisible, setCreateVisible] = useState(false);
   const [newName, setNewName] = useState('');
@@ -65,11 +67,16 @@ export default function MyShelvesScreen() {
   async function load() {
     setLoading(true);
     try {
-      const libs = await getMyLibraries();
-      const booksResults = await Promise.all(libs.map((lib) => getBooksInLibrary(lib.id)));
-      setShelves(libs.map((lib, i) => ({ library: lib, books: booksResults[i] })));
+      const [libs, followed] = await Promise.all([getMyLibraries(), getFollowedLibraries()]);
+      const [myBooks, followedBooks] = await Promise.all([
+        Promise.all(libs.map((lib) => getBooksInLibrary(lib.id))),
+        Promise.all(followed.map((lib) => getBooksInLibrary(lib.id))),
+      ]);
+      setShelves(libs.map((lib, i) => ({ library: lib, books: myBooks[i] })));
+      setFollowedShelves(followed.map((lib, i) => ({ library: lib, books: followedBooks[i] })));
     } catch {
       setShelves([]);
+      setFollowedShelves([]);
     } finally {
       setLoading(false);
     }
@@ -122,7 +129,7 @@ export default function MyShelvesScreen() {
 
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={colors.primary} size="large" /></View>
-      ) : shelves.length === 0 ? (
+      ) : shelves.length === 0 && followedShelves.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="library-outline" size={64} color={colors.border} />
           <Text style={styles.emptyTitle}>No shelves yet</Text>
@@ -183,6 +190,45 @@ export default function MyShelvesScreen() {
             <Ionicons name="add" size={18} color={colors.primary} />
             <Text style={styles.newShelfRowText}>New Shelf</Text>
           </TouchableOpacity>
+
+          {followedShelves.length > 0 && (
+            <>
+              <View style={[styles.sectionDivider, { marginTop: spacing.sm }]}>
+                <Text style={styles.sectionDividerLabel}>Following</Text>
+                <View style={styles.sectionDividerLine} />
+              </View>
+              {followedShelves.map(({ library, books }) => (
+                <View key={library.id} style={styles.shelfSection}>
+                  <TouchableOpacity
+                    style={styles.shelfHeader}
+                    onPress={() => router.push(`/library/view/${library.id}`)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 7 }}>
+                        <Text style={styles.shelfName}>{library.name}</Text>
+                        <Text style={styles.shelfOwner}>{library.ownerDisplayName}</Text>
+                      </View>
+                      <Text style={styles.shelfMeta}>{books.length} {books.length === 1 ? 'book' : 'books'}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.borderDark} />
+                  </TouchableOpacity>
+                  {books.length > 0 ? (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+                      {books.map((book) => (
+                        <BookCover key={book.id} book={book} onPress={() => router.push(`/library/view/${library.id}`)} />
+                      ))}
+                    </ScrollView>
+                  ) : (
+                    <View style={styles.emptyRail}>
+                      <Ionicons name="book-outline" size={22} color={colors.border} />
+                      <Text style={styles.emptyRailText}>No books yet</Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </>
+          )}
         </ScrollView>
       )}
 
@@ -268,6 +314,7 @@ const styles = StyleSheet.create({
   sectionDividerLine: { flex: 1, height: 1, backgroundColor: colors.borderCard },
   shelfName: { fontSize: 17, fontWeight: '600', color: colors.text, fontFamily: 'Georgia' },
   shelfMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  shelfOwner: { fontSize: 12, color: colors.textSecondary },
 
   rail: { paddingHorizontal: spacing.md, gap: spacing.sm, paddingBottom: spacing.xs },
 
