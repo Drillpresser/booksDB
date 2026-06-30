@@ -306,6 +306,12 @@ export default function ContactDetailScreen() {
                 <Text style={styles.metaText}>{contact.phone}</Text>
               </View>
             )}
+            {contact.createdAt && (
+              <View style={styles.metaRow}>
+                <Ionicons name="time-outline" size={13} color={colors.textMuted} />
+                <Text style={styles.metaText}>Patron since {new Date(contact.createdAt).getFullYear()}</Text>
+              </View>
+            )}
             <TouchableOpacity style={styles.editChip} onPress={startEdit}>
               <Ionicons name="pencil-outline" size={14} color={colors.primary} />
               <Text style={styles.editChipText}>Edit</Text>
@@ -358,7 +364,7 @@ export default function ContactDetailScreen() {
                     <Text style={styles.loanMeta} numberOfLines={1}>
                       {loan.bookRecord.authors[0] ?? ''}
                     </Text>
-                    <Text style={styles.loanDate}>Since {formatDate(loan.dateLent)}</Text>
+                    <Text style={styles.loanDate}>Lent by You · {formatDate(loan.dateLent)}</Text>
                   </View>
                   <View style={styles.loanRight}>
                     <View style={[styles.pill, { backgroundColor: pill.bg }]}>

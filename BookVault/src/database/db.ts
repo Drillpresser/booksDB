@@ -10,7 +10,7 @@ export function getDB(): SQLite.SQLiteDatabase {
   return _db;
 }
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 function migrate(db: SQLite.SQLiteDatabase) {
   const versionRow = db.getFirstSync('PRAGMA user_version') as any;
@@ -118,6 +118,14 @@ function migrate(db: SQLite.SQLiteDatabase) {
       );
     `);
     db.runSync(`PRAGMA user_version = 3`);
+  }
+
+  if (currentVersion < 4) {
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS preferences (key TEXT PRIMARY KEY, value TEXT);
+      ALTER TABLE contacts ADD COLUMN created_at TEXT;
+    `);
+    db.runSync(`PRAGMA user_version = 4`);
   }
 }
 

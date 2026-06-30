@@ -27,7 +27,7 @@ export function getHoldsForRecord(recordId: string): HoldWithContact[] {
     contactId: r.contact_id,
     requestedAt: r.requested_at,
     notes: r.notes,
-    contact: { id: r.c_id, name: r.name, phone: r.phone, email: r.email, notes: r.c_notes, color: r.color },
+    contact: { id: r.c_id, name: r.name, phone: r.phone, email: r.email, notes: r.c_notes, color: r.color, createdAt: null },
   }));
 }
 

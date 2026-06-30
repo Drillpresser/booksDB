@@ -8,13 +8,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
 import { getAllCopies, searchCopies } from '../../src/database/queries/books';
+import { getPreference, setPreference } from '../../src/database/queries/preferences';
 import type { BookCopyWithDetails } from '../../src/types';
 
 type SortMode = 'author' | 'title';
 
 export default function LibraryScreen() {
   const router = useRouter();
-  const [sortMode, setSortMode] = useState<SortMode>('author');
+  const [sortMode, setSortMode] = useState<SortMode>(() => getPreference('library_sort', 'author') as SortMode);
   const [searchQuery, setSearchQuery] = useState('');
   const [books, setBooks] = useState<BookCopyWithDetails[]>([]);
 
@@ -79,7 +80,7 @@ export default function LibraryScreen() {
             <TouchableOpacity
               key={mode}
               style={[styles.sortChip, sortMode === mode && styles.sortChipActive]}
-              onPress={() => setSortMode(mode)}
+              onPress={() => { setPreference('library_sort', mode); setSortMode(mode); }}
             >
               <Text style={[styles.sortChipText, sortMode === mode && styles.sortChipTextActive]}>
                 {mode === 'author' ? 'Author' : 'Title'}

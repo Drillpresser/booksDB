@@ -141,6 +141,7 @@ export default function LendingScreen() {
                   <Text style={styles.loanTitle} numberOfLines={1}>{loan.bookRecord.title}</Text>
                   <View style={styles.patronRow}>
                     <Ionicons name="people-outline" size={14} color={colors.textMuted} />
+                    <Text style={styles.patronLabel}>Lent to </Text>
                     <Text style={styles.patronName}>{loan.contact.name}</Text>
                   </View>
                   <View style={[styles.pill, { backgroundColor: pill.bg }]}>
@@ -200,6 +201,7 @@ export default function LendingScreen() {
                       <Text style={styles.loanTitle} numberOfLines={1}>{loan.bookRecord.title}</Text>
                       <View style={styles.patronRow}>
                         <Ionicons name="people-outline" size={13} color={colors.textMuted} />
+                        <Text style={styles.patronLabel}>Lent to </Text>
                         <Text style={styles.patronName}>{loan.contact.name}</Text>
                       </View>
                       <Text style={styles.spanText}>{span}</Text>
@@ -246,7 +248,8 @@ const styles = StyleSheet.create({
   loanInfo: { flex: 1, gap: 4 },
   loanTitle: { fontSize: 15.5, fontWeight: '600', color: colors.text, lineHeight: 19, fontFamily: 'Georgia' },
   patronRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  patronName: { fontSize: 13, color: colors.textSecondary },
+  patronLabel: { fontSize: 13, color: colors.textMuted },
+  patronName: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
   pill: { alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 14 },
   pillText: { fontSize: 11.5, fontWeight: '600' },
   spanText: { fontSize: 11.5, color: colors.textMuted },

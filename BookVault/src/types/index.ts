@@ -64,6 +64,7 @@ export interface Contact {
   email: string | null;
   notes: string | null;
   color: string | null;
+  createdAt: string | null;
 }
 
 export interface Loan {

@@ -9,6 +9,7 @@ function rowToContact(row: any): Contact {
     email: row.email,
     notes: row.notes,
     color: row.color ?? null,
+    createdAt: row.created_at ?? null,
   };
 }
 
@@ -24,12 +25,12 @@ export function getContactById(id: string): Contact | null {
   return row ? rowToContact(row) : null;
 }
 
-export function createContact(data: Omit<Contact, 'id'>): string {
+export function createContact(data: Omit<Contact, 'id' | 'createdAt'>): string {
   const db = getDB();
   const id = generateId();
   db.runSync(
-    'INSERT INTO contacts (id, name, phone, email, notes, color) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, data.name, data.phone, data.email, data.notes, data.color ?? null]
+    'INSERT INTO contacts (id, name, phone, email, notes, color, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [id, data.name, data.phone, data.email, data.notes, data.color ?? null, new Date().toISOString()]
   );
   return id;
 }

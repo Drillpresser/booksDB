@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, TextInput,
-  Alert, ScrollView,
+  Alert, ScrollView, Share,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
 import { getApiKey, saveApiKey, deleteApiKey } from '../../src/services/claude';
+import { getPreference, setPreference } from '../../src/database/queries/preferences';
+import { getAllCopies } from '../../src/database/queries/books';
+import { getDB } from '../../src/database/db';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { AuthSheet } from '../../src/components/AuthSheet';
+
+type SortMode = 'author' | 'title';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -19,11 +24,15 @@ export default function SettingsScreen() {
   const [hasKey, setHasKey] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>(() => getPreference('library_sort', 'author') as SortMode);
+  const [volumeCount, setVolumeCount] = useState(0);
 
   useEffect(() => {
     getApiKey().then((k) => {
       if (k) { setHasKey(true); setApiKey(k); }
     });
+    const row = getDB().getFirstSync('SELECT COUNT(*) as cnt FROM book_copies') as any;
+    setVolumeCount(row?.cnt ?? 0);
   }, []);
 
   async function handleSaveKey() {
@@ -51,6 +60,40 @@ export default function SettingsScreen() {
         },
       },
     ]);
+  }
+
+  function toggleSort() {
+    const next: SortMode = sortMode === 'author' ? 'title' : 'author';
+    setPreference('library_sort', next);
+    setSortMode(next);
+  }
+
+  async function handleExport() {
+    try {
+      const books = getAllCopies();
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        volumeCount: books.length,
+        books: books.map((b) => ({
+          title: b.record.title,
+          authors: b.record.authors,
+          isbn13: b.record.isbn13,
+          publisher: b.record.publisher,
+          publishedYear: b.record.publishedYear,
+          pageCount: b.record.pageCount,
+          deweyDecimal: b.record.deweyDecimal,
+          personalRating: b.personalRating,
+          copyNumber: b.copyNumber,
+          notes: b.notes,
+          dateAdded: b.dateAdded,
+          isOnLoan: b.isOnLoan,
+        })),
+      };
+      const json = JSON.stringify(payload, null, 2);
+      await Share.share({ message: json, title: 'BookVault Library Export' });
+    } catch {
+      Alert.alert('Export Failed', 'Could not export your library.');
+    }
   }
 
   return (
@@ -108,6 +151,18 @@ export default function SettingsScreen() {
         <View style={styles.divider} />
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Library</Text>
+          <TouchableOpacity style={styles.navRow} onPress={toggleSort}>
+            <Ionicons name="swap-vertical-outline" size={22} color={colors.primary} />
+            <Text style={styles.navRowText}>Default sort</Text>
+            <Text style={styles.navRowValue}>{sortMode === 'author' ? 'Author' : 'Title'}</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.divider} />
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Classifications</Text>
           <Text style={styles.sectionDesc}>
             Manage your MainClass → Section → Division hierarchy.
@@ -132,7 +187,13 @@ export default function SettingsScreen() {
                 <Text style={styles.accountAvatarText}>{(user.email ?? 'U').charAt(0).toUpperCase()}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.accountEmail}>{user.email ?? 'Signed in'}</Text>
+                {user.user_metadata?.full_name ? (
+                  <Text style={styles.accountName}>{user.user_metadata.full_name}</Text>
+                ) : null}
+                <Text style={styles.accountEmail}>
+                  {user.email ?? 'Signed in'}
+                  {volumeCount > 0 ? ` · ${volumeCount} volumes` : ''}
+                </Text>
               </View>
               <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
                 <Text style={styles.signOutBtnText}>Sign Out</Text>
@@ -143,6 +204,18 @@ export default function SettingsScreen() {
               <Text style={styles.signInBtnText}>Sign In</Text>
             </TouchableOpacity>
           )}
+        </View>
+
+        <View style={styles.divider} />
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Data</Text>
+          <TouchableOpacity style={styles.navRow} onPress={handleExport}>
+            <Ionicons name="share-outline" size={22} color={colors.primary} />
+            <Text style={styles.navRowText}>Export Library</Text>
+            <Text style={styles.navRowValue}>{volumeCount} vols · JSON</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.divider} />
@@ -189,4 +262,6 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.border },
   navRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surfaceCard, borderRadius: 14, padding: spacing.md, borderWidth: 1, borderColor: colors.borderCard },
   navRowText: { flex: 1, fontSize: 16, color: colors.text },
+  navRowValue: { fontSize: 14, color: colors.textSecondary },
+  accountName: { fontSize: 15, fontWeight: '700', color: colors.text, fontFamily: 'Georgia' },
 });

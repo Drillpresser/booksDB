@@ -287,7 +287,7 @@ function getCurrentLoanForCopy(copyId: string): LoanWithContact | null {
     expectedReturn: row.expected_return,
     dateReturned: row.date_returned,
     notes: row.notes,
-    contact: { id: row.c_id, name: row.c_name, phone: row.c_phone, email: row.c_email, notes: row.c_notes, color: row.c_color ?? null },
+    contact: { id: row.c_id, name: row.c_name, phone: row.c_phone, email: row.c_email, notes: row.c_notes, color: row.c_color ?? null, createdAt: null },
     isOverdue,
   };
 }

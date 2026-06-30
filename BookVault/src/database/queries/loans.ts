@@ -39,7 +39,7 @@ function rowToDetail(row: any): LoanWithDetails {
   };
   return {
     ...loan,
-    contact: { id: row.c_id, name: row.c_name, phone: row.c_phone, email: row.c_email, notes: row.c_notes, color: row.c_color ?? null },
+    contact: { id: row.c_id, name: row.c_name, phone: row.c_phone, email: row.c_email, notes: row.c_notes, color: row.c_color ?? null, createdAt: null },
     bookRecord: {
       id: row.br_id,
       title: row.title,

@@ -357,7 +357,7 @@ export default function BookDetailScreen() {
             </TouchableOpacity>
             {historyExpanded && pastLoans.map((loan) => (
               <View key={loan.id} style={styles.historyRow}>
-                <Text style={styles.historyName}>{loan.contact.name}</Text>
+                <Text style={styles.historyName}>Lent to {loan.contact.name}</Text>
                 <Text style={styles.historyDates}>{formatDate(loan.dateLent)} – {loan.dateReturned ? formatDate(loan.dateReturned) : 'Not returned'}</Text>
               </View>
             ))}
