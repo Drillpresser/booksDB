@@ -12,6 +12,8 @@ import { CommunityRatings } from '../../src/components/CommunityRatings';
 import { getCopyById, updateBookCopy, deleteBookCopy, getRecordCopySummary } from '../../src/database/queries/books';
 import { getLoanHistoryForCopy, createLoan, returnLoan } from '../../src/database/queries/loans';
 import { getAllContacts, createContact } from '../../src/database/queries/contacts';
+import { getHoldsForRecord, addHold, removeHold } from '../../src/database/queries/holds';
+import type { HoldWithContact } from '../../src/database/queries/holds';
 import {
   updateBookLoanStatus, getMyLibraries, getLibraryIdsForCopy,
   upsertBookInLibrary, removeBookFromLibrary,
@@ -36,6 +38,10 @@ export default function BookDetailScreen() {
   const [myLibraries, setMyLibraries] = useState<Library[]>([]);
   const [memberLibraryIds, setMemberLibraryIds] = useState<string[]>([]);
   const [copySummary, setCopySummary] = useState<{ total: number; available: number } | null>(null);
+  const [holds, setHolds] = useState<HoldWithContact[]>([]);
+  const [holdModalVisible, setHoldModalVisible] = useState(false);
+  const [holdContactSearch, setHoldContactSearch] = useState('');
+  const [holdContacts, setHoldContacts] = useState<Contact[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -49,7 +55,10 @@ export default function BookDetailScreen() {
       const data = getCopyById(copyId);
       setBook(data);
       setLoanHistory(getLoanHistoryForCopy(copyId));
-      if (data) setCopySummary(getRecordCopySummary(data.recordId));
+      if (data) {
+        setCopySummary(getRecordCopySummary(data.recordId));
+        setHolds(getHoldsForRecord(data.recordId));
+      }
     } catch {
       // SQLite error — leave book null, screen shows "not found"
     }
@@ -81,7 +90,7 @@ export default function BookDetailScreen() {
 
   function handleLend() {
     setContacts(getAllContacts());
-    setSelectedContact(null);
+    setSelectedContact(holds.length > 0 ? holds[0].contact : null);
     setReturnDate(null);
     setShowDatePicker(false);
     setLoanNotes('');
@@ -109,6 +118,9 @@ export default function BookDetailScreen() {
 
     const returnIso = returnDate ? returnDate.toISOString().split('T')[0] : null;
     createLoan(book.id, contactId, new Date().toISOString(), returnIso, loanNotes.trim() || null);
+    if (holds.length > 0 && holds[0].contactId === contactId) {
+      removeHold(holds[0].id);
+    }
     setLendModalVisible(false);
     loadData();
     updateBookLoanStatus(book.id, true).catch(() => {});
@@ -172,6 +184,12 @@ export default function BookDetailScreen() {
         },
       },
     ]);
+  }
+
+  function openHoldModal() {
+    setHoldContacts(getAllContacts());
+    setHoldContactSearch('');
+    setHoldModalVisible(true);
   }
 
   if (!book) {
@@ -264,15 +282,39 @@ export default function BookDetailScreen() {
         )}
 
         {book.isOnLoan ? (
-          <View style={styles.lendBtnDisabled}>
-            <Ionicons name="time-outline" size={20} color={colors.textMuted} />
-            <Text style={styles.lendBtnDisabledText}>Unavailable to Lend</Text>
+          <View style={{ gap: spacing.sm }}>
+            <View style={styles.lendBtnDisabled}>
+              <Ionicons name="time-outline" size={20} color={colors.textMuted} />
+              <Text style={styles.lendBtnDisabledText}>Unavailable to Lend</Text>
+            </View>
+            <TouchableOpacity style={styles.waitlistRow} onPress={openHoldModal}>
+              <Ionicons name="person-add-outline" size={17} color={colors.primary} />
+              <Text style={styles.waitlistText}>
+                {holds.length > 0
+                  ? `${holds.length} on waitlist · Manage`
+                  : 'Add to waitlist'}
+              </Text>
+              <Ionicons name="chevron-forward" size={15} color={colors.primaryDark} />
+            </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity style={styles.lendBtn} onPress={handleLend}>
-            <Ionicons name="swap-horizontal-outline" size={20} color="#fff" />
-            <Text style={styles.lendBtnText}>Lend This Book</Text>
-          </TouchableOpacity>
+          <>
+            {holds.length > 0 && (
+              <View style={styles.nextInQueueBanner}>
+                <Ionicons name="list-outline" size={15} color={colors.primary} />
+                <Text style={styles.nextInQueueText}>
+                  {holds.length} patron{holds.length > 1 ? 's' : ''} on waitlist · {holds[0].contact.name} is next
+                </Text>
+                <TouchableOpacity onPress={openHoldModal}>
+                  <Text style={[styles.nextInQueueText, { textDecorationLine: 'underline' }]}>Manage</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <TouchableOpacity style={styles.lendBtn} onPress={handleLend}>
+              <Ionicons name="swap-horizontal-outline" size={20} color="#fff" />
+              <Text style={styles.lendBtnText}>Lend This Book</Text>
+            </TouchableOpacity>
+          </>
         )}
 
         {book.record.isbn13 ? (
@@ -358,6 +400,88 @@ export default function BookDetailScreen() {
         </View>
       </ScrollView>
 
+      <Modal visible={holdModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Waitlist</Text>
+            <TouchableOpacity onPress={() => setHoldModalVisible(false)}>
+              <Ionicons name="close" size={26} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} keyboardShouldPersistTaps="handled">
+            {holds.length > 0 ? (
+              <View style={{ gap: spacing.xs }}>
+                <Text style={styles.fieldLabel}>Queue</Text>
+                {holds.map((hold, i) => (
+                  <View key={hold.id} style={styles.holdRow}>
+                    <View style={styles.holdPosition}>
+                      <Text style={styles.holdPositionText}>#{i + 1}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.holdName}>{hold.contact.name}</Text>
+                      <Text style={styles.holdDate}>Added {formatDate(hold.requestedAt)}</Text>
+                    </View>
+                    <TouchableOpacity
+                      hitSlop={10}
+                      onPress={() => {
+                        removeHold(hold.id);
+                        if (book) setHolds(getHoldsForRecord(book.recordId));
+                      }}
+                    >
+                      <Ionicons name="trash-outline" size={19} color={colors.danger} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.holdEmptyState}>
+                <Ionicons name="list-outline" size={38} color={colors.border} />
+                <Text style={styles.holdEmptyText}>Nobody on the waitlist yet.</Text>
+              </View>
+            )}
+
+            <View style={{ gap: spacing.sm }}>
+              <Text style={styles.fieldLabel}>Add Patron</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Search contacts..."
+                value={holdContactSearch}
+                onChangeText={setHoldContactSearch}
+                placeholderTextColor={colors.textSecondary}
+                autoCorrect={false}
+              />
+              {holdContactSearch.length > 0 && (() => {
+                const alreadyIn = new Set(holds.map((h) => h.contactId));
+                const filtered = holdContacts.filter(
+                  (c) => !alreadyIn.has(c.id) && c.name.toLowerCase().includes(holdContactSearch.toLowerCase())
+                );
+                return filtered.length > 0 ? filtered.map((c) => (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={styles.contactRow}
+                    onPress={() => {
+                      if (book) {
+                        addHold(book.recordId, c.id);
+                        setHolds(getHoldsForRecord(book.recordId));
+                        setHoldContactSearch('');
+                      }
+                    }}
+                  >
+                    <Ionicons name="person-outline" size={17} color={colors.primary} style={{ marginRight: spacing.sm }} />
+                    <Text style={styles.contactName}>{c.name}</Text>
+                    <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
+                  </TouchableOpacity>
+                )) : (
+                  <Text style={{ fontSize: 14, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.sm }}>
+                    No contacts match "{holdContactSearch}"
+                  </Text>
+                );
+              })()}
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
       <Modal visible={lendModalVisible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={styles.modalHeader}>
@@ -367,6 +491,15 @@ export default function BookDetailScreen() {
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}>
+            {holds.length > 0 && (
+              <View style={styles.nextInQueueBanner}>
+                <Ionicons name="list-outline" size={15} color={colors.primary} />
+                <Text style={styles.nextInQueueText}>
+                  Next on waitlist: <Text style={{ fontWeight: '700' }}>{holds[0].contact.name}</Text>
+                  {holds.length > 1 ? ` (+${holds.length - 1} more)` : ''}
+                </Text>
+              </View>
+            )}
             <Text style={styles.fieldLabel}>Lending to</Text>
             <FlatList
               scrollEnabled={false}
@@ -505,4 +638,15 @@ const styles = StyleSheet.create({
   libraryChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   libraryChipText: { fontSize: 13, color: colors.primary, fontWeight: '500' },
   libraryChipTextActive: { color: '#fff' },
+  waitlistRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 11, borderWidth: 1, borderColor: colors.primaryLight, backgroundColor: 'rgba(231,125,54,0.06)' },
+  waitlistText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.primary },
+  nextInQueueBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.primaryLight, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.primary, flexWrap: 'wrap' },
+  nextInQueueText: { fontSize: 13, color: colors.primaryDark, fontWeight: '600' },
+  holdRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surfaceCard, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.borderCard, marginBottom: spacing.xs },
+  holdPosition: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  holdPositionText: { color: '#fff', fontSize: 12, fontWeight: '700', fontFamily: 'Courier' },
+  holdName: { fontSize: 15, fontWeight: '600', color: colors.text, fontFamily: 'Georgia' },
+  holdDate: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
+  holdEmptyState: { alignItems: 'center', paddingVertical: 30, gap: spacing.sm },
+  holdEmptyText: { fontSize: 14, color: colors.textSecondary },
 });

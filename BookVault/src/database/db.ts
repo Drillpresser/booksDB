@@ -10,7 +10,7 @@ export function getDB(): SQLite.SQLiteDatabase {
   return _db;
 }
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 function migrate(db: SQLite.SQLiteDatabase) {
   const versionRow = db.getFirstSync('PRAGMA user_version') as any;
@@ -103,6 +103,21 @@ function migrate(db: SQLite.SQLiteDatabase) {
   if (currentVersion < 2) {
     db.execSync(`ALTER TABLE contacts ADD COLUMN color TEXT`);
     db.runSync(`PRAGMA user_version = 2`);
+  }
+
+  if (currentVersion < 3) {
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS holds (
+        id TEXT PRIMARY KEY,
+        record_id TEXT NOT NULL,
+        contact_id TEXT NOT NULL,
+        requested_at TEXT NOT NULL,
+        notes TEXT,
+        FOREIGN KEY (record_id) REFERENCES book_records(id) ON DELETE CASCADE,
+        FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+      );
+    `);
+    db.runSync(`PRAGMA user_version = 3`);
   }
 }
 
