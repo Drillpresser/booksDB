@@ -1,5 +1,8 @@
 # Ignore environment variable files
-.env    
+.env
+
+# Ignore local Claude settings (may contain secrets / access tokens)
+.claude/settings.local.json
 
 # Ignore node_modules directory
 node_modules/

@@ -4,11 +4,11 @@
       "command": "npx",
       "args": [
         "-y",
-        "@supabase/mcp-server-supabase@latest",
-        "--supabase-url",
-        "https://xukrezkcuufoqkiwnkkj.supabase.co",
-        "--supabase-key",
-        "${SUPABASE_ACCESS_TOKEN}"
+        "@supabase/mcp-server-supabase",
+        "--access-token",
+        "${SUPABASE_ACCESS_TOKEN}",
+        "--project-ref",
+        "xukrezkcuufoqkiwnkkj"
       ]
     }
   }
