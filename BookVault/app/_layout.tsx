@@ -4,11 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import { colors } from '../src/theme';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
+import { DisplayNameDialog } from '../src/components/DisplayNameDialog';
 
 SplashScreen.preventAutoHideAsync();
 
 function AppTabs() {
-  const { loading } = useAuth();
+  const { loading, namePromptUserId, clearNamePrompt } = useAuth();
 
   useEffect(() => {
     if (loading) return;
@@ -18,6 +19,8 @@ function AppTabs() {
   }, [loading]);
 
   return (
+    <>
+    <DisplayNameDialog visible={namePromptUserId !== null} variant="prompt" onClose={clearNamePrompt} />
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -66,6 +69,7 @@ function AppTabs() {
         }}
       />
     </Tabs>
+    </>
   );
 }
 

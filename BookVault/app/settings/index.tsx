@@ -13,6 +13,7 @@ import { getAllCopies } from '../../src/database/queries/books';
 import { getDB } from '../../src/database/db';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { AuthSheet } from '../../src/components/AuthSheet';
+import { DisplayNameDialog } from '../../src/components/DisplayNameDialog';
 
 type SortMode = 'author' | 'title';
 
@@ -20,6 +21,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { user, signOut, deleteAccount } = useAuth();
   const [authVisible, setAuthVisible] = useState(false);
+  const [editNameVisible, setEditNameVisible] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [hasKey, setHasKey] = useState(false);
@@ -226,6 +228,12 @@ export default function SettingsScreen() {
                 <Text style={styles.signOutBtnText}>Sign Out</Text>
               </TouchableOpacity>
             </View>
+            <TouchableOpacity style={styles.navRow} onPress={() => setEditNameVisible(true)}>
+              <Ionicons name="person-outline" size={22} color={colors.primary} />
+              <Text style={styles.navRowText}>Display name</Text>
+              <Text style={styles.navRowValue} numberOfLines={1}>{user.user_metadata?.full_name ?? 'Set a name'}</Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={handleDeleteAccount} disabled={deletingAccount} style={styles.deleteAccountBtn}>
               <Text style={styles.deleteAccountText}>
                 {deletingAccount ? 'Deleting Account…' : 'Delete Account'}
@@ -261,6 +269,7 @@ export default function SettingsScreen() {
       </ScrollView>
 
       <AuthSheet visible={authVisible} onClose={() => setAuthVisible(false)} />
+      <DisplayNameDialog visible={editNameVisible} variant="edit" onClose={() => setEditNameVisible(false)} />
     </SafeAreaView>
   );
 }

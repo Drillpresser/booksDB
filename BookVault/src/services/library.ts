@@ -117,6 +117,17 @@ export async function getMyDisplayName(): Promise<string> {
   return (data as any)?.display_name ?? user.email?.split('@')[0] ?? 'Reader';
 }
 
+export async function setMyDisplayName(name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Display name cannot be empty');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  const { error } = await supabase.from('profiles').update({ display_name: trimmed }).eq('id', user.id);
+  if (error) throw error;
+  // Keep auth metadata in sync so the Settings header and future derivations agree
+  await supabase.auth.updateUser({ data: { full_name: trimmed } });
+}
+
 // ── My Libraries ───────────────────────────────────────────────────────────
 
 export async function getMyLibraries(): Promise<Library[]> {

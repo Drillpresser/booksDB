@@ -6,6 +6,7 @@ import * as Linking from 'expo-linking';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { supabase } from '../lib/supabase';
+import { getPreference, setPreference } from '../database/queries/preferences';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -15,30 +16,52 @@ type AuthContextType = {
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
+  // User id to prompt for a display name after a fresh sign-in (once per account)
+  namePromptUserId: string | null;
+  clearNamePrompt: () => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null, session: null, loading: true,
   signInWithGoogle: async () => {},
   signInWithApple: async () => {},
+  signInWithEmail: async () => {},
+  signUpWithEmail: async () => ({ needsConfirmation: false }),
   signOut: async () => {},
   deleteAccount: async () => {},
+  namePromptUserId: null,
+  clearNamePrompt: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [namePromptUserId, setNamePromptUserId] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      setSession(s);
+      // Offer a display-name change once per account on the first real sign-in
+      // (INITIAL_SESSION on cold start / TOKEN_REFRESHED are ignored on purpose)
+      if (event === 'SIGNED_IN' && s?.user && getPreference(`name_prompted_${s.user.id}`, '') !== '1') {
+        setNamePromptUserId(s.user.id);
+      }
+    });
     return () => subscription.unsubscribe();
   }, []);
+
+  function clearNamePrompt() {
+    if (namePromptUserId) setPreference(`name_prompted_${namePromptUserId}`, '1');
+    setNamePromptUserId(null);
+  }
 
   async function signInWithGoogle() {
     const redirectUri = __DEV__
@@ -106,6 +129,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function signInWithEmail(email: string, password: string) {
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (error) throw error;
+  }
+
+  async function signUpWithEmail(email: string, password: string) {
+    const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+    if (error) throw error;
+    // With email confirmation on, signUp returns no session until the link is clicked
+    return { needsConfirmation: !data.session };
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
   }
@@ -120,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user: session?.user ?? null, session, loading, signInWithGoogle, signInWithApple, signOut, deleteAccount }}>
+    <AuthContext.Provider value={{ user: session?.user ?? null, session, loading, signInWithGoogle, signInWithApple, signInWithEmail, signUpWithEmail, signOut, deleteAccount, namePromptUserId, clearNamePrompt }}>
       {children}
     </AuthContext.Provider>
   );
