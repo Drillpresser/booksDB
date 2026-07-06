@@ -7,7 +7,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing, radius } from '../../src/theme';
+import { colors, fonts, spacing, radius } from '../../src/theme';
 import { CommunityRatings } from '../../src/components/CommunityRatings';
 import { getCopyById, updateBookCopy, deleteBookCopy, getRecordCopySummary } from '../../src/database/queries/books';
 import { getLoanHistoryForCopy, createLoan, returnLoan } from '../../src/database/queries/loans';
@@ -586,9 +586,9 @@ const styles = StyleSheet.create({
   heroRow: { flexDirection: 'row', gap: spacing.md },
   cover: { width: 92, height: 132, borderRadius: 8, overflow: 'hidden', position: 'relative', justifyContent: 'center', alignItems: 'center', padding: 10 },
   coverInsetBorder: { position: 'absolute', top: 6, left: 6, right: 6, bottom: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', borderRadius: 3 },
-  coverPlaceholderTitle: { fontFamily: 'Georgia', fontWeight: '600', fontSize: 12, lineHeight: 16, color: 'rgba(250,243,224,0.96)', textAlign: 'center' },
+  coverPlaceholderTitle: { fontFamily: fonts.serif, fontWeight: '600', fontSize: 12, lineHeight: 16, color: 'rgba(250,243,224,0.96)', textAlign: 'center' },
   heroInfo: { flex: 1, gap: spacing.xs },
-  title: { fontSize: 21, fontWeight: '700', color: colors.text, fontFamily: 'Georgia', lineHeight: 26 },
+  title: { fontSize: 21, fontWeight: '700', color: colors.text, fontFamily: fonts.serif, lineHeight: 26 },
   authors: { fontSize: 14, color: colors.textSecondary },
   meta: { fontSize: 13, color: colors.textSecondary },
   copyLabel: { fontSize: 12, color: colors.primary, fontWeight: '600' },
@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
   availBannerText: { fontSize: 13, fontWeight: '600' },
   dotsRow: { flexDirection: 'row', gap: 3 },
   dot: { width: 9, height: 9, borderRadius: 5 },
-  dotLabel: { fontFamily: 'Courier', fontSize: 11, color: colors.textMuted },
+  dotLabel: { fontFamily: fonts.mono, fontSize: 11, color: colors.textMuted },
   loanCard: { backgroundColor: '#FFF8E1', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.onLoan, gap: spacing.xs },
   loanCardOverdue: { backgroundColor: '#FFEBEE', borderColor: colors.danger },
   loanCardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
   lendBtnDisabled: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.surfaceAlt, borderRadius: 11, padding: 13, borderWidth: 1, borderColor: colors.border },
   lendBtnDisabledText: { color: colors.textMuted, fontSize: 16, fontWeight: '700' },
   section: { gap: spacing.sm },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, fontFamily: 'Georgia' },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, fontFamily: fonts.serif },
   starsRow: { flexDirection: 'row', gap: spacing.sm },
   communityRating: { fontSize: 13, color: colors.textSecondary },
   synopsis: { fontSize: 14, color: colors.text, lineHeight: 21 },
@@ -644,8 +644,8 @@ const styles = StyleSheet.create({
   nextInQueueText: { fontSize: 13, color: colors.primaryDark, fontWeight: '600' },
   holdRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surfaceCard, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.borderCard, marginBottom: spacing.xs },
   holdPosition: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  holdPositionText: { color: '#fff', fontSize: 12, fontWeight: '700', fontFamily: 'Courier' },
-  holdName: { fontSize: 15, fontWeight: '600', color: colors.text, fontFamily: 'Georgia' },
+  holdPositionText: { color: '#fff', fontSize: 12, fontWeight: '700', fontFamily: fonts.mono },
+  holdName: { fontSize: 15, fontWeight: '600', color: colors.text, fontFamily: fonts.serif },
   holdDate: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
   holdEmptyState: { alignItems: 'center', paddingVertical: 30, gap: spacing.sm },
   holdEmptyText: { fontSize: 14, color: colors.textSecondary },

@@ -3,9 +3,7 @@
     "version": ">= 16.0.0"
   },
   "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal",
+    "base": {
       "ios": {
         "image": "macos-sequoia-15.6-xcode-26.2"
       },
@@ -13,29 +11,26 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://xukrezkcuufoqkiwnkkj.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_gP8CV1N_XYBLYC2RzHYGug_XL1hc0RN",
         "EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY": "AIzaSyBUcZK1up9hPbDtsZv5yTlxyvKQf3Mltaw"
+      }
+    },
+    "development": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
       }
     },
     "preview": {
+      "extends": "base",
       "distribution": "internal",
-      "ios": {
-        "image": "macos-sequoia-15.6-xcode-26.2"
-      },
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://xukrezkcuufoqkiwnkkj.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_gP8CV1N_XYBLYC2RzHYGug_XL1hc0RN",
-        "EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY": "AIzaSyBUcZK1up9hPbDtsZv5yTlxyvKQf3Mltaw"
+      "android": {
+        "buildType": "apk"
       }
     },
     "production": {
-      "autoIncrement": true,
-      "ios": {
-        "image": "macos-sequoia-15.6-xcode-26.2"
-      },
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://xukrezkcuufoqkiwnkkj.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_gP8CV1N_XYBLYC2RzHYGug_XL1hc0RN",
-        "EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY": "AIzaSyBUcZK1up9hPbDtsZv5yTlxyvKQf3Mltaw"
-      }
+      "extends": "base",
+      "autoIncrement": true
     }
   },
   "submit": {

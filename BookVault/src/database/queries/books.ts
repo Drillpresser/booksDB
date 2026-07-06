@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { getDB, generateId } from '../db';
 import type { BookRecord, BookCopy, BookCopyWithDetails, LoanWithContact } from '../../types';
 

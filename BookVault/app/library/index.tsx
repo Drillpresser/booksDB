@@ -6,7 +6,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing, radius } from '../../src/theme';
+import { colors, fonts, spacing, radius } from '../../src/theme';
 import { getAllCopies, searchCopies } from '../../src/database/queries/books';
 import { getPreference, setPreference } from '../../src/database/queries/preferences';
 import type { BookCopyWithDetails } from '../../src/types';
@@ -184,7 +184,7 @@ function BookRow({ book, availability, onPress }: { book: BookCopyWithDetails; a
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   headerRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: 6, paddingBottom: 4 },
-  heading: { fontSize: 34, fontWeight: '600', color: colors.text, letterSpacing: -0.3, fontFamily: 'Georgia' },
+  heading: { fontSize: 34, fontWeight: '600', color: colors.text, letterSpacing: -0.3, fontFamily: fonts.serif },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, margin: spacing.md, marginBottom: spacing.sm, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.border },
   searchInput: { flex: 1, fontSize: 16, color: colors.text },
   sortRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm },
@@ -193,16 +193,16 @@ const styles = StyleSheet.create({
   sortChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   sortChipText: { fontSize: 13, color: colors.textSecondary },
   sortChipTextActive: { color: '#fff', fontWeight: '600' },
-  volCount: { flex: 1, textAlign: 'right', fontSize: 12, color: colors.textMuted, fontFamily: 'Courier' },
+  volCount: { flex: 1, textAlign: 'right', fontSize: 12, color: colors.textMuted, fontFamily: fonts.mono },
   bookRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.surfaceCard, marginHorizontal: spacing.md, marginBottom: spacing.sm, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: colors.borderCard },
   cover: { width: 44, height: 64, borderRadius: 4, flexShrink: 0 },
   coverPlaceholder: { backgroundColor: colors.surfaceAlt, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   spineAccent: { position: 'absolute', left: 5, top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(255,255,255,0.4)' },
   bookInfo: { flex: 1, minWidth: 0 },
-  bookTitle: { fontSize: 16, fontWeight: '600', color: colors.text, lineHeight: 19, fontFamily: 'Georgia' },
+  bookTitle: { fontSize: 16, fontWeight: '600', color: colors.text, lineHeight: 19, fontFamily: fonts.serif },
   bookAuthor: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   bookChips: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 6 },
-  callChip: { fontSize: 10, letterSpacing: 0.3, color: colors.textMuted, backgroundColor: colors.surfaceAlt, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, fontFamily: 'Courier' },
+  callChip: { fontSize: 10, letterSpacing: 0.3, color: colors.textMuted, backgroundColor: colors.surfaceAlt, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, fontFamily: fonts.mono },
   bookMeta: { alignItems: 'flex-end', gap: spacing.xs, flexShrink: 0 },
   loanBadge: { backgroundColor: colors.onLoan, borderRadius: 5, paddingHorizontal: spacing.sm, paddingVertical: 2 },
   loanBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },

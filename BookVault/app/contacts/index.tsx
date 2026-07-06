@@ -6,7 +6,7 @@ import {
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing, radius } from '../../src/theme';
+import { colors, fonts, spacing, radius } from '../../src/theme';
 import { getAllContacts, createContact, getContactLoanStatus } from '../../src/database/queries/contacts';
 import type { Contact } from '../../src/types';
 import type { ContactLoanStatus } from '../../src/database/queries/contacts';
@@ -243,7 +243,7 @@ export default function ContactsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   headerRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: 6, paddingBottom: 2 },
-  title: { fontSize: 34, fontWeight: '600', color: colors.text, letterSpacing: -0.3, fontFamily: 'Georgia' },
+  title: { fontSize: 34, fontWeight: '600', color: colors.text, letterSpacing: -0.3, fontFamily: fonts.serif },
   searchBar: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, marginHorizontal: spacing.md, marginTop: spacing.sm, paddingHorizontal: 14, paddingVertical: 11 },
   searchInput: { flex: 1, fontSize: 16, color: colors.text },
   list: { padding: spacing.md, gap: spacing.sm },
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   avatar: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   avatarText: { color: 'rgba(250,243,224,0.96)', fontSize: 16, fontWeight: '600' },
   contactInfo: { flex: 1, minWidth: 0 },
-  contactName: { fontSize: 16, fontWeight: '600', color: colors.text, fontFamily: 'Georgia' },
+  contactName: { fontSize: 16, fontWeight: '600', color: colors.text, fontFamily: fonts.serif },
   contactMeta: { fontSize: 12.5, color: colors.textMuted, marginTop: 2 },
   metaRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 0 },
   pill: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 14 },

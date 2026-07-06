@@ -7,7 +7,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing, radius } from '../../src/theme';
+import { colors, fonts, spacing, radius } from '../../src/theme';
 import { getContactById, updateContact, deleteContact } from '../../src/database/queries/contacts';
 import { getLoanHistoryForContact, createLoan, returnLoan } from '../../src/database/queries/loans';
 import { getAllCopies } from '../../src/database/queries/books';
@@ -620,7 +620,7 @@ const styles = StyleSheet.create({
   profileCenter: { alignItems: 'center', paddingTop: spacing.sm, gap: 4 },
   avatarLg: { width: 88, height: 88, borderRadius: 44, justifyContent: 'center', alignItems: 'center' },
   avatarLgText: { color: 'rgba(250,243,224,0.96)', fontSize: 32, fontWeight: '600' },
-  contactName: { fontSize: 23, fontWeight: '700', color: colors.text, marginTop: 11, fontFamily: 'Georgia' },
+  contactName: { fontSize: 23, fontWeight: '700', color: colors.text, marginTop: 11, fontFamily: fonts.serif },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
   metaText: { fontSize: 13, color: colors.textSecondary },
   editChip: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
   // Stats
   statsBar: { flexDirection: 'row', backgroundColor: colors.surfaceCard, borderRadius: 13, borderWidth: 1, borderColor: colors.borderCard, overflow: 'hidden' },
   statItem: { flex: 1, alignItems: 'center', paddingVertical: 12 },
-  statNum: { fontSize: 22, fontWeight: '700', fontFamily: 'Georgia' },
+  statNum: { fontSize: 22, fontWeight: '700', fontFamily: fonts.serif },
   statLabel: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
   statDivider: { width: 1, backgroundColor: colors.border },
 
@@ -652,7 +652,7 @@ const styles = StyleSheet.create({
   // Section
   section: { gap: spacing.sm },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', color: colors.primaryDark, textTransform: 'uppercase', letterSpacing: 1.2, fontFamily: 'Courier' },
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: colors.primaryDark, textTransform: 'uppercase', letterSpacing: 1.2, fontFamily: fonts.mono },
   sectionLine: { flex: 1, height: 1, backgroundColor: colors.border },
 
   // Active loan card

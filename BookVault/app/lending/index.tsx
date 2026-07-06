@@ -5,7 +5,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing, radius } from '../../src/theme';
+import { colors, fonts, spacing, radius } from '../../src/theme';
 import { getActiveLoans, getAllReturnedLoans, returnLoan } from '../../src/database/queries/loans';
 import type { LoanWithDetails } from '../../src/types';
 
@@ -232,7 +232,7 @@ const colors2 = colors as any;
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   titleRow: { paddingHorizontal: 22, paddingTop: 6, paddingBottom: 2 },
-  title: { fontSize: 34, fontWeight: '600', color: colors.text, letterSpacing: -0.3, fontFamily: 'Georgia' },
+  title: { fontSize: 34, fontWeight: '600', color: colors.text, letterSpacing: -0.3, fontFamily: fonts.serif },
   segmented: { flexDirection: 'row', backgroundColor: colors.surfaceAlt, borderRadius: 11, padding: 4, marginHorizontal: spacing.md, marginTop: 6 },
   segment: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
   segmentActive: { backgroundColor: colors.background, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   loanCard: { flexDirection: 'row', alignItems: 'center', gap: 13, backgroundColor: colors.surfaceCard, borderRadius: 14, borderWidth: 1, borderColor: colors.borderCard, padding: 12 },
   historyCard: { flexDirection: 'row', alignItems: 'center', gap: 13, backgroundColor: colors.surfaceCard, borderRadius: 14, borderWidth: 1, borderColor: colors.borderCard, padding: 11, marginBottom: spacing.sm },
   loanInfo: { flex: 1, gap: 4 },
-  loanTitle: { fontSize: 15.5, fontWeight: '600', color: colors.text, lineHeight: 19, fontFamily: 'Georgia' },
+  loanTitle: { fontSize: 15.5, fontWeight: '600', color: colors.text, lineHeight: 19, fontFamily: fonts.serif },
   patronRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   patronLabel: { fontSize: 13, color: colors.textMuted },
   patronName: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   pillText: { fontSize: 11.5, fontWeight: '600' },
   spanText: { fontSize: 11.5, color: colors.textMuted },
   monthHeader: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 5, marginBottom: spacing.sm },
-  monthLabel: { fontSize: 11, fontWeight: '600', color: colors.primaryDark, textTransform: 'uppercase', letterSpacing: 1.2, fontFamily: 'Courier' },
+  monthLabel: { fontSize: 11, fontWeight: '600', color: colors.primaryDark, textTransform: 'uppercase', letterSpacing: 1.2, fontFamily: fonts.mono },
   monthLine: { flex: 1, height: 1, backgroundColor: colors.border },
   emptyState: { alignItems: 'center', paddingTop: 80, paddingHorizontal: spacing.xl },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: colors.text, marginTop: spacing.md },

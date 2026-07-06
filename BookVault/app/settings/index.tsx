@@ -6,7 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing, radius } from '../../src/theme';
+import { colors, fonts, spacing, radius } from '../../src/theme';
 import { getApiKey, saveApiKey, deleteApiKey } from '../../src/services/claude';
 import { getPreference, setPreference } from '../../src/database/queries/preferences';
 import { getAllCopies } from '../../src/database/queries/books';
@@ -235,10 +235,10 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   headerRow: { paddingHorizontal: 22, paddingTop: 6, paddingBottom: 4 },
-  heading: { fontSize: 34, fontWeight: '600', color: colors.text, letterSpacing: -0.3, fontFamily: 'Georgia' },
+  heading: { fontSize: 34, fontWeight: '600', color: colors.text, letterSpacing: -0.3, fontFamily: fonts.serif },
   scroll: { padding: spacing.md, gap: spacing.md },
   section: { gap: spacing.md },
-  sectionTitle: { fontSize: 11, fontWeight: '600', color: colors.primaryDark, textTransform: 'uppercase', letterSpacing: 1.4, fontFamily: 'Courier' },
+  sectionTitle: { fontSize: 11, fontWeight: '600', color: colors.primaryDark, textTransform: 'uppercase', letterSpacing: 1.4, fontFamily: fonts.mono },
   sectionDesc: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
   keyStatus: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   keyStatusText: { fontSize: 14, color: colors.success, fontWeight: '600' },
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   hint: { fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
   accountRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surfaceCard, borderRadius: 14, padding: spacing.md, borderWidth: 1, borderColor: colors.borderCard },
   accountAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: colors.text, justifyContent: 'center', alignItems: 'center' },
-  accountAvatarText: { color: 'rgba(250,243,224,0.96)', fontWeight: '600', fontSize: 18, fontFamily: 'Georgia' },
+  accountAvatarText: { color: 'rgba(250,243,224,0.96)', fontWeight: '600', fontSize: 18, fontFamily: fonts.serif },
   accountEmail: { fontSize: 14, color: colors.text },
   signOutBtn: { borderWidth: 1, borderColor: colors.danger, borderRadius: radius.md, paddingVertical: spacing.xs, paddingHorizontal: spacing.md },
   signOutBtnText: { color: colors.danger, fontWeight: '600', fontSize: 14 },
@@ -263,5 +263,5 @@ const styles = StyleSheet.create({
   navRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surfaceCard, borderRadius: 14, padding: spacing.md, borderWidth: 1, borderColor: colors.borderCard },
   navRowText: { flex: 1, fontSize: 16, color: colors.text },
   navRowValue: { fontSize: 14, color: colors.textSecondary },
-  accountName: { fontSize: 15, fontWeight: '700', color: colors.text, fontFamily: 'Georgia' },
+  accountName: { fontSize: 15, fontWeight: '700', color: colors.text, fontFamily: fonts.serif },
 });

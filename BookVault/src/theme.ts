@@ -2,6 +2,15 @@
 // Tom Thumb #2d4a2b · Chalet Green #4c703e · Sushi #85af3c
 // Sandy Brown #f1a350 · Jaffa #e77d36
 
+import { Platform } from 'react-native';
+
+// Georgia and Courier are iOS system fonts that don't exist on Android;
+// fall back to the platform's generic serif/monospace families there.
+export const fonts = {
+  serif: Platform.select({ ios: 'Georgia', default: 'serif' }),
+  mono: Platform.select({ ios: 'Courier', default: 'monospace' }),
+};
+
 export const colors = {
   primary: '#E77D36',        // jaffa — buttons, headers, active states
   primaryLight: '#FDE8D0',   // pale apricot — chip/badge backgrounds, avatars

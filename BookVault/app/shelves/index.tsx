@@ -6,7 +6,7 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing, radius } from '../../src/theme';
+import { colors, fonts, spacing, radius } from '../../src/theme';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { getMyLibraries, getBooksInLibrary, createLibrary, getFollowedLibraries } from '../../src/services/library';
 import type { Library, LibraryBook, LibraryWithMeta } from '../../src/services/library';
@@ -303,16 +303,16 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: '600', color: colors.text, marginTop: spacing.md, textAlign: 'center' },
   emptySubtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.sm, textAlign: 'center', lineHeight: 20 },
   headerRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: 6, paddingBottom: 4 },
-  title: { fontSize: 34, fontWeight: '600', color: colors.text, letterSpacing: -0.3, fontFamily: 'Georgia' },
+  title: { fontSize: 34, fontWeight: '600', color: colors.text, letterSpacing: -0.3, fontFamily: fonts.serif },
 
   scrollContent: { paddingBottom: spacing.xl },
 
   shelfSection: { marginBottom: spacing.lg },
   shelfHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   sectionDivider: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: spacing.md, paddingTop: 11, paddingBottom: 4 },
-  sectionDividerLabel: { fontFamily: 'Courier', fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.primaryDark },
+  sectionDividerLabel: { fontFamily: fonts.mono, fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.primaryDark },
   sectionDividerLine: { flex: 1, height: 1, backgroundColor: colors.borderCard },
-  shelfName: { fontSize: 17, fontWeight: '600', color: colors.text, fontFamily: 'Georgia' },
+  shelfName: { fontSize: 17, fontWeight: '600', color: colors.text, fontFamily: fonts.serif },
   shelfMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   shelfOwner: { fontSize: 12, color: colors.textSecondary },
 

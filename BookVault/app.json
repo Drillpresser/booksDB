@@ -12,19 +12,29 @@
     },
     "orientation": "portrait",
     "scheme": "bookvault",
-    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.bookvault.app",
-      "newArchEnabled": false,
       "infoPlist": {
         "UIDesignRequiresCompatibility": true,
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "8"
+      "buildNumber": "9",
+      "usesAppleSignIn": true
+    },
+    "android": {
+      "package": "com.bookvault.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FAF3E0"
+      }
     },
     "plugins": [
       "expo-router",
+      "expo-apple-authentication",
       [
         "expo-camera",
         {
