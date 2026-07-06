@@ -16,6 +16,7 @@ type AuthContextType = {
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -23,6 +24,7 @@ const AuthContext = createContext<AuthContextType>({
   signInWithGoogle: async () => {},
   signInWithApple: async () => {},
   signOut: async () => {},
+  deleteAccount: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -108,8 +110,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   }
 
+  async function deleteAccount() {
+    const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
+    if (error) {
+      throw new Error(error.message ?? 'Could not delete account.');
+    }
+    // The server-side user is already gone; only clear the local session
+    await supabase.auth.signOut({ scope: 'local' });
+  }
+
   return (
-    <AuthContext.Provider value={{ user: session?.user ?? null, session, loading, signInWithGoogle, signInWithApple, signOut }}>
+    <AuthContext.Provider value={{ user: session?.user ?? null, session, loading, signInWithGoogle, signInWithApple, signOut, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );

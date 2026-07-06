@@ -1,5 +1,11 @@
+import * as Crypto from 'expo-crypto';
 import { supabase } from '../lib/supabase';
-import { generateId } from '../database/db';
+
+// Invite tokens are shared credentials — use a CSPRNG, not Math.random()
+function generateInviteToken(): string {
+  const bytes = Crypto.getRandomBytes(32);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -304,7 +310,7 @@ export async function deleteCard(cardId: string): Promise<void> {
 }
 
 export async function createInvite(libraryId: string): Promise<LibraryCard | null> {
-  const token = generateId();
+  const token = generateInviteToken();
   const { data, error } = await supabase.from('library_cards')
     .insert({ library_id: libraryId, user_id: null, status: 'invite', invite_token: token })
     .select().single();
@@ -312,23 +318,28 @@ export async function createInvite(libraryId: string): Promise<LibraryCard | nul
   return toCard(data);
 }
 
-export async function getInviteByToken(token: string): Promise<{ card: LibraryCard; library: Library } | null> {
-  const { data } = await supabase.from('library_cards').select('*')
-    .eq('invite_token', token).eq('status', 'invite').is('user_id', null).maybeSingle();
-  if (!data) return null;
-  const library = await getLibraryById(data.library_id);
-  if (!library) return null;
-  return { card: toCard(data), library };
+export async function getInviteByToken(token: string): Promise<{ library: Library } | null> {
+  // Invite rows aren't directly selectable; a SECURITY DEFINER RPC validates the token
+  const { data, error } = await supabase.rpc('get_invite', { p_token: token });
+  const row = Array.isArray(data) ? data[0] : data;
+  if (error || !row) return null;
+  return {
+    library: {
+      id: row.library_id,
+      ownerId: '',
+      name: row.library_name,
+      description: row.library_description,
+      isPublic: false,
+      createdAt: '',
+    },
+  };
 }
 
-export async function claimInvite(cardId: string): Promise<void> {
+export async function claimInvite(token: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
   const displayName = await getMyDisplayName();
-  const { error } = await supabase.from('library_cards').update({
-    user_id: user.id, status: 'approved', requester_display_name: displayName,
-    updated_at: new Date().toISOString(),
-  }).eq('id', cardId);
+  const { error } = await supabase.rpc('claim_invite', { p_token: token, p_display_name: displayName });
   if (error) throw error;
 }
 

@@ -9,7 +9,7 @@ import { colors, spacing, radius } from '../../../src/theme';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { AuthSheet } from '../../../src/components/AuthSheet';
 import { getInviteByToken, claimInvite } from '../../../src/services/library';
-import type { Library, LibraryCard } from '../../../src/services/library';
+import type { Library } from '../../../src/services/library';
 
 export default function InviteScreen() {
   const { token } = useLocalSearchParams<{ token: string }>();
@@ -18,7 +18,6 @@ export default function InviteScreen() {
 
   const [loading, setLoading] = useState(true);
   const [library, setLibrary] = useState<Library | null>(null);
-  const [card, setCard] = useState<LibraryCard | null>(null);
   const [invalid, setInvalid] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [authVisible, setAuthVisible] = useState(false);
@@ -29,7 +28,7 @@ export default function InviteScreen() {
     getInviteByToken(token)
       .then((result) => {
         if (!result) { setInvalid(true); }
-        else { setLibrary(result.library); setCard(result.card); }
+        else { setLibrary(result.library); }
       })
       .catch(() => setInvalid(true))
       .finally(() => setLoading(false));
@@ -37,10 +36,10 @@ export default function InviteScreen() {
 
   async function handleClaim() {
     if (!user) { setAuthVisible(true); return; }
-    if (!card) return;
+    if (!token) return;
     setClaiming(true);
     try {
-      await claimInvite(card.id);
+      await claimInvite(token);
       setClaimed(true);
     } catch (e: any) {
       const msg = e?.message ?? '';

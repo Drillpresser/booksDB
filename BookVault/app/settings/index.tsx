@@ -18,8 +18,9 @@ type SortMode = 'author' | 'title';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, signOut, deleteAccount } = useAuth();
   const [authVisible, setAuthVisible] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [hasKey, setHasKey] = useState(false);
   const [showKey, setShowKey] = useState(false);
@@ -94,6 +95,31 @@ export default function SettingsScreen() {
     } catch {
       Alert.alert('Export Failed', 'Could not export your library.');
     }
+  }
+
+  function handleDeleteAccount() {
+    Alert.alert(
+      'Delete Account',
+      'This permanently deletes your account and all cloud data: shared shelves, library cards, ratings, and book requests. Books in your local library stay on this device.\n\nThis cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingAccount(true);
+            try {
+              await deleteAccount();
+              Alert.alert('Account Deleted', 'Your account and cloud data have been removed.');
+            } catch (e: any) {
+              Alert.alert('Delete Failed', e.message ?? 'Could not delete your account. Please try again.');
+            } finally {
+              setDeletingAccount(false);
+            }
+          },
+        },
+      ]
+    );
   }
 
   return (
@@ -182,6 +208,7 @@ export default function SettingsScreen() {
             Sign in to rate books and see community ratings from other readers.
           </Text>
           {user ? (
+            <>
             <View style={styles.accountRow}>
               <View style={styles.accountAvatar}>
                 <Text style={styles.accountAvatarText}>{(user.email ?? 'U').charAt(0).toUpperCase()}</Text>
@@ -199,6 +226,12 @@ export default function SettingsScreen() {
                 <Text style={styles.signOutBtnText}>Sign Out</Text>
               </TouchableOpacity>
             </View>
+            <TouchableOpacity onPress={handleDeleteAccount} disabled={deletingAccount} style={styles.deleteAccountBtn}>
+              <Text style={styles.deleteAccountText}>
+                {deletingAccount ? 'Deleting Account…' : 'Delete Account'}
+              </Text>
+            </TouchableOpacity>
+            </>
           ) : (
             <TouchableOpacity style={styles.signInBtn} onPress={() => setAuthVisible(true)}>
               <Text style={styles.signInBtnText}>Sign In</Text>
@@ -257,6 +290,8 @@ const styles = StyleSheet.create({
   accountEmail: { fontSize: 14, color: colors.text },
   signOutBtn: { borderWidth: 1, borderColor: colors.danger, borderRadius: radius.md, paddingVertical: spacing.xs, paddingHorizontal: spacing.md },
   signOutBtnText: { color: colors.danger, fontWeight: '600', fontSize: 14 },
+  deleteAccountBtn: { alignSelf: 'center', paddingVertical: spacing.xs, paddingHorizontal: spacing.md },
+  deleteAccountText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
   signInBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, alignSelf: 'flex-start' },
   signInBtnText: { color: '#fff', fontWeight: '700' },
   divider: { height: 1, backgroundColor: colors.border },
