@@ -9,7 +9,7 @@ import { DisplayNameDialog } from '../src/components/DisplayNameDialog';
 SplashScreen.preventAutoHideAsync();
 
 function AppTabs() {
-  const { loading, namePromptUserId, clearNamePrompt } = useAuth();
+  const { loading, namePromptUserId, clearNamePrompt, authSheetOpen } = useAuth();
 
   useEffect(() => {
     if (loading) return;
@@ -20,7 +20,7 @@ function AppTabs() {
 
   return (
     <>
-    <DisplayNameDialog visible={namePromptUserId !== null} variant="prompt" onClose={clearNamePrompt} />
+    <DisplayNameDialog visible={namePromptUserId !== null && !authSheetOpen} variant="prompt" onClose={clearNamePrompt} />
     <Tabs
       screenOptions={{
         headerShown: false,

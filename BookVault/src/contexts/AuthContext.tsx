@@ -23,6 +23,10 @@ type AuthContextType = {
   // User id to prompt for a display name after a fresh sign-in (once per account)
   namePromptUserId: string | null;
   clearNamePrompt: () => void;
+  // True while the AuthSheet modal is natively presented; the name prompt must
+  // wait for it to dismiss or iOS tears the prompt down with the sheet
+  authSheetOpen: boolean;
+  setAuthSheetOpen: (open: boolean) => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -35,12 +39,15 @@ const AuthContext = createContext<AuthContextType>({
   deleteAccount: async () => {},
   namePromptUserId: null,
   clearNamePrompt: () => {},
+  authSheetOpen: false,
+  setAuthSheetOpen: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [namePromptUserId, setNamePromptUserId] = useState<string | null>(null);
+  const [authSheetOpen, setAuthSheetOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -155,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user: session?.user ?? null, session, loading, signInWithGoogle, signInWithApple, signInWithEmail, signUpWithEmail, signOut, deleteAccount, namePromptUserId, clearNamePrompt }}>
+    <AuthContext.Provider value={{ user: session?.user ?? null, session, loading, signInWithGoogle, signInWithApple, signInWithEmail, signUpWithEmail, signOut, deleteAccount, namePromptUserId, clearNamePrompt, authSheetOpen, setAuthSheetOpen }}>
       {children}
     </AuthContext.Provider>
   );

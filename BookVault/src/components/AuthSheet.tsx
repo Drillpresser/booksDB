@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Modal,
   ActivityIndicator, Platform, Alert, ScrollView, KeyboardAvoidingView,
@@ -13,7 +13,7 @@ type Props = { visible: boolean; onClose: () => void };
 type Mode = 'signin' | 'signup';
 
 export function AuthSheet({ visible, onClose }: Props) {
-  const { signInWithGoogle, signInWithApple, signInWithEmail, signUpWithEmail } = useAuth();
+  const { signInWithGoogle, signInWithApple, signInWithEmail, signUpWithEmail, setAuthSheetOpen } = useAuth();
   const [busyGoogle, setBusyGoogle] = useState(false);
   const [busyApple, setBusyApple] = useState(false);
   const [busyEmail, setBusyEmail] = useState(false);
@@ -21,6 +21,16 @@ export function AuthSheet({ visible, onClose }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const busy = busyGoogle || busyApple || busyEmail;
+
+  // The post-login display-name prompt must not present while this sheet is up:
+  // on iOS a modal presented over the sheet is torn down when the sheet dismisses.
+  // Mark open when shown; mark closed on native dismissal (Modal onDismiss, iOS)
+  // or immediately on hide elsewhere, and on unmount as a safety net.
+  useEffect(() => {
+    if (visible) setAuthSheetOpen(true);
+    else if (Platform.OS !== 'ios') setAuthSheetOpen(false);
+  }, [visible]);
+  useEffect(() => () => setAuthSheetOpen(false), []);
 
   async function handleGoogle() {
     if (busy) return;
@@ -73,7 +83,7 @@ export function AuthSheet({ visible, onClose }: Props) {
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose} onDismiss={() => setAuthSheetOpen(false)}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
