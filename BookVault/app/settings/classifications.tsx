@@ -13,7 +13,9 @@ import {
   updateMainClass, updateSection, updateDivision,
   deleteMainClass, deleteSection, deleteDivision,
   getBookCountForMainClass, getBookCountForSection, getBookCountForDivision,
+  importClassifications,
 } from '../../src/database/queries/classifications';
+import { RFFC_CLASSIFICATIONS, RFFC_VERSION } from '../../src/data/rffcClassifications';
 import type { MainClass, Section, Division } from '../../src/types';
 
 type Level = 'main' | 'section' | 'division';
@@ -93,6 +95,40 @@ export default function ClassificationsScreen() {
       setDivisionsMap((prev) => ({ ...prev, [modal.parentId!]: getDivisionsBySection(modal.parentId!) }));
     }
     setModal({ visible: false, level: 'main' });
+  }
+
+  function handleImportRffc() {
+    const nSections = RFFC_CLASSIFICATIONS.reduce((n, c) => n + c.sections.length, 0);
+    const nDivisions = RFFC_CLASSIFICATIONS.reduce(
+      (n, c) => n + c.sections.reduce((k, s) => k + s.divisions.length, 0), 0
+    );
+    Alert.alert(
+      `Import RFFC v${RFFC_VERSION}`,
+      `Load the Robinson Fiction-Forward Classification system: ${RFFC_CLASSIFICATIONS.length} main classes, ${nSections} sections, ${nDivisions} divisions.\n\nYour existing entries are kept — anything with a matching code is skipped.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Import',
+          onPress: () => {
+            try {
+              const { added, skipped } = importClassifications(RFFC_CLASSIFICATIONS);
+              setMainClasses(getAllMainClasses());
+              setSectionsMap({});
+              setDivisionsMap({});
+              setExpanded({});
+              Alert.alert(
+                'Import Complete',
+                skipped > 0
+                  ? `Added ${added} entries. ${skipped} already existed and were kept as-is.`
+                  : `Added ${added} entries.`
+              );
+            } catch {
+              Alert.alert('Import Failed', 'Could not import the classification system. No changes were made.');
+            }
+          },
+        },
+      ]
+    );
   }
 
   function handleDelete(level: Level, id: string, itemName: string) {
@@ -194,10 +230,16 @@ export default function ClassificationsScreen() {
           </View>
         )}
         ListFooterComponent={
-          <TouchableOpacity style={styles.addMainBtn} onPress={() => openAdd('main')}>
-            <Ionicons name="add" size={20} color="#fff" />
-            <Text style={styles.addMainBtnText}>Add Main Class</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity style={styles.addMainBtn} onPress={() => openAdd('main')}>
+              <Ionicons name="add" size={20} color="#fff" />
+              <Text style={styles.addMainBtnText}>Add Main Class</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.importBtn} onPress={handleImportRffc}>
+              <Ionicons name="download-outline" size={18} color={colors.primary} />
+              <Text style={styles.importBtnText}>Import RFFC v{RFFC_VERSION}</Text>
+            </TouchableOpacity>
+          </>
         }
       />
 
@@ -241,6 +283,8 @@ const styles = StyleSheet.create({
   addChildText: { color: colors.primary, fontSize: 13, fontWeight: '500' },
   addMainBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.sm },
   addMainBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  importBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.sm },
+  importBtnText: { color: colors.primary, fontWeight: '600', fontSize: 15 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderColor: colors.border },
   modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   modalForm: { padding: spacing.md, gap: spacing.md },

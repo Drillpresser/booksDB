@@ -1,5 +1,19 @@
 import { getDB, generateId } from '../db';
 import type { MainClass, Section, Division } from '../../types';
+import type { SeedMainClass } from '../../data/rffcClassifications';
+
+// Bumped on every hierarchy mutation. Lets consumers (e.g. the memoized
+// classification prompt in claude.ts) cache derived data until the taxonomy
+// actually changes.
+let taxonomyVersion = 0;
+
+export function getTaxonomyVersion(): number {
+  return taxonomyVersion;
+}
+
+function bumpTaxonomyVersion() {
+  taxonomyVersion++;
+}
 
 function rowToMainClass(row: any): MainClass {
   return { id: row.id, code: row.code, name: row.name, sortOrder: row.sort_order };
@@ -64,6 +78,7 @@ export function createMainClass(code: string, name: string): MainClass {
     'INSERT INTO main_classes (id, code, name, sort_order) VALUES (?, ?, ?, ?)',
     [id, code, name, sortOrder]
   );
+  bumpTaxonomyVersion();
   return { id, code, name, sortOrder };
 }
 
@@ -79,6 +94,7 @@ export function createSection(mainClassId: string, code: string, name: string): 
     'INSERT INTO sections (id, code, name, main_class_id, sort_order) VALUES (?, ?, ?, ?, ?)',
     [id, code, name, mainClassId, sortOrder]
   );
+  bumpTaxonomyVersion();
   return { id, code, name, mainClassId, sortOrder };
 }
 
@@ -94,37 +110,105 @@ export function createDivision(sectionId: string, code: string, name: string): D
     'INSERT INTO divisions (id, code, name, section_id, sort_order) VALUES (?, ?, ?, ?, ?)',
     [id, code, name, sectionId, sortOrder]
   );
+  bumpTaxonomyVersion();
   return { id, code, name, sectionId, sortOrder };
 }
 
 export function updateMainClass(id: string, code: string, name: string) {
   const db = getDB();
   db.runSync('UPDATE main_classes SET code = ?, name = ? WHERE id = ?', [code, name, id]);
+  bumpTaxonomyVersion();
 }
 
 export function updateSection(id: string, code: string, name: string) {
   const db = getDB();
   db.runSync('UPDATE sections SET code = ?, name = ? WHERE id = ?', [code, name, id]);
+  bumpTaxonomyVersion();
 }
 
 export function updateDivision(id: string, code: string, name: string) {
   const db = getDB();
   db.runSync('UPDATE divisions SET code = ?, name = ? WHERE id = ?', [code, name, id]);
+  bumpTaxonomyVersion();
 }
 
 export function deleteMainClass(id: string) {
   const db = getDB();
   db.runSync('DELETE FROM main_classes WHERE id = ?', [id]);
+  bumpTaxonomyVersion();
 }
 
 export function deleteSection(id: string) {
   const db = getDB();
   db.runSync('DELETE FROM sections WHERE id = ?', [id]);
+  bumpTaxonomyVersion();
 }
 
 export function deleteDivision(id: string) {
   const db = getDB();
   db.runSync('DELETE FROM divisions WHERE id = ?', [id]);
+  bumpTaxonomyVersion();
+}
+
+// Merge a bundled classification system into the hierarchy. Matches by code at
+// each level so it is idempotent: existing entries (and any user edits to their
+// names) are left alone, missing ones are inserted in document order.
+export function importClassifications(data: SeedMainClass[]): { added: number; skipped: number } {
+  const db = getDB();
+  let added = 0;
+  let skipped = 0;
+
+  db.withTransactionSync(() => {
+    data.forEach((mc, mcIdx) => {
+      let mcRow = db.getFirstSync('SELECT id FROM main_classes WHERE code = ?', [mc.code]) as any;
+      if (mcRow) {
+        skipped++;
+      } else {
+        mcRow = { id: generateId() };
+        db.runSync(
+          'INSERT INTO main_classes (id, code, name, sort_order) VALUES (?, ?, ?, ?)',
+          [mcRow.id, mc.code, mc.name, mcIdx]
+        );
+        added++;
+      }
+
+      mc.sections.forEach((sec, secIdx) => {
+        let secRow = db.getFirstSync(
+          'SELECT id FROM sections WHERE main_class_id = ? AND code = ?',
+          [mcRow.id, sec.code]
+        ) as any;
+        if (secRow) {
+          skipped++;
+        } else {
+          secRow = { id: generateId() };
+          db.runSync(
+            'INSERT INTO sections (id, code, name, main_class_id, sort_order) VALUES (?, ?, ?, ?, ?)',
+            [secRow.id, sec.code, sec.name, mcRow.id, secIdx]
+          );
+          added++;
+        }
+
+        sec.divisions.forEach((div, divIdx) => {
+          const divRow = db.getFirstSync(
+            'SELECT id FROM divisions WHERE section_id = ? AND code = ?',
+            [secRow.id, div.code]
+          );
+          if (divRow) {
+            skipped++;
+          } else {
+            db.runSync(
+              'INSERT INTO divisions (id, code, name, section_id, sort_order) VALUES (?, ?, ?, ?, ?)',
+              [generateId(), div.code, div.name, secRow.id, divIdx]
+            );
+            added++;
+          }
+        });
+      });
+    });
+  });
+
+  if (added > 0) bumpTaxonomyVersion();
+  return { added, skipped };
 }
 
 export function getBookCountForDivision(divisionId: string): number {
