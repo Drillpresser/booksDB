@@ -48,6 +48,8 @@ function rowToCopy(row: any): BookCopy {
     recordId: row.record_id,
     copyNumber: row.copy_number,
     divisionId: row.division_id,
+    suffix: row.suffix ?? null,
+    tags: parseTags(row.tags),
     personalRating: row.personal_rating,
     notes: row.notes,
     dateAdded: row.date_added,
@@ -57,7 +59,7 @@ function rowToCopy(row: any): BookCopy {
 const COPY_DETAIL_QUERY = `
   SELECT
     bc.id, bc.record_id, bc.copy_number, bc.division_id,
-    bc.personal_rating, bc.notes, bc.date_added,
+    bc.suffix, bc.tags, bc.personal_rating, bc.notes, bc.date_added,
     br.title, br.authors, br.sort_author, br.isbn13,
     br.publisher, br.published_year, br.page_count,
     br.synopsis, br.cover_image, br.dewey_decimal,
@@ -73,6 +75,15 @@ const COPY_DETAIL_QUERY = `
   LEFT JOIN main_classes m ON s.main_class_id = m.id
 `;
 
+export function parseTags(raw: any): string[] {
+  try {
+    const parsed = JSON.parse(raw ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter((t) => typeof t === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 function rowToDetail(row: any): BookCopyWithDetails {
   const record = rowToRecord(row);
   record.id = row.record_id;
@@ -82,6 +93,8 @@ function rowToDetail(row: any): BookCopyWithDetails {
     recordId: row.record_id,
     copyNumber: row.copy_number,
     divisionId: row.division_id,
+    suffix: row.suffix ?? null,
+    tags: parseTags(row.tags),
     personalRating: row.personal_rating,
     notes: row.notes,
     dateAdded: row.date_added,
@@ -98,13 +111,19 @@ function rowToDetail(row: any): BookCopyWithDetails {
   };
 }
 
-export function getAllCopies(sortBy: 'author' | 'title' | 'dateAdded' | 'classification' = 'classification'): BookCopyWithDetails[] {
+export type CopySortMode = 'author' | 'title' | 'dateAdded' | 'mainClass' | 'section' | 'classification';
+
+export function getAllCopies(sortBy: CopySortMode = 'classification'): BookCopyWithDetails[] {
   const db = getDB();
+  // Classification sorts order hierarchically down to the chosen level, then by
+  // author/title; unclassified copies sort last (NULLs would otherwise sort first).
   const orderClause = {
     author: 'br.sort_author, br.title',
     title: 'br.title, br.sort_author',
     dateAdded: 'bc.date_added DESC',
-    classification: 'm.sort_order, m.code, s.sort_order, s.code, d.sort_order, d.code, br.sort_author, br.title',
+    mainClass: '(bc.division_id IS NULL), m.sort_order, m.code, br.sort_author, br.title',
+    section: '(bc.division_id IS NULL), m.sort_order, m.code, s.sort_order, s.code, br.sort_author, br.title',
+    classification: '(bc.division_id IS NULL), m.sort_order, m.code, s.sort_order, s.code, d.sort_order, d.code, br.sort_author, br.title',
   }[sortBy];
 
   const rows = db.getAllSync(`${COPY_DETAIL_QUERY} ORDER BY ${orderClause}`) as any[];
@@ -178,9 +197,9 @@ export function insertBookCopy(data: Omit<BookCopy, 'id'>): string {
   const db = getDB();
   const id = generateId();
   db.runSync(
-    `INSERT INTO book_copies (id, record_id, copy_number, division_id, personal_rating, notes, date_added)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [id, data.recordId, data.copyNumber, data.divisionId, data.personalRating, data.notes, data.dateAdded]
+    `INSERT INTO book_copies (id, record_id, copy_number, division_id, suffix, tags, personal_rating, notes, date_added)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, data.recordId, data.copyNumber, data.divisionId, data.suffix, JSON.stringify(data.tags), data.personalRating, data.notes, data.dateAdded]
   );
   return id;
 }
@@ -211,10 +230,16 @@ export function updateBookRecord(id: string, data: Partial<Omit<BookRecord, 'id'
   }
 }
 
-export function updateBookCopy(id: string, data: Partial<Pick<BookCopy, 'divisionId' | 'personalRating' | 'notes'>>) {
+export function updateBookCopy(id: string, data: Partial<Pick<BookCopy, 'divisionId' | 'suffix' | 'tags' | 'personalRating' | 'notes'>>) {
   const db = getDB();
   if (data.divisionId !== undefined) {
     db.runSync('UPDATE book_copies SET division_id = ? WHERE id = ?', [data.divisionId, id]);
+  }
+  if (data.suffix !== undefined) {
+    db.runSync('UPDATE book_copies SET suffix = ? WHERE id = ?', [data.suffix, id]);
+  }
+  if (data.tags !== undefined) {
+    db.runSync('UPDATE book_copies SET tags = ? WHERE id = ?', [JSON.stringify(data.tags), id]);
   }
   if (data.personalRating !== undefined) {
     db.runSync('UPDATE book_copies SET personal_rating = ? WHERE id = ?', [data.personalRating, id]);

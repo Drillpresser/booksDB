@@ -8,10 +8,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fonts, spacing, radius } from '../../src/theme';
 import { getAllCopies, searchCopies } from '../../src/database/queries/books';
+import type { CopySortMode } from '../../src/database/queries/books';
 import { getPreference, setPreference } from '../../src/database/queries/preferences';
 import type { BookCopyWithDetails } from '../../src/types';
 
-type SortMode = 'author' | 'title';
+type SortMode = 'author' | 'title' | 'mainClass' | 'section' | 'classification';
+
+const SORT_OPTIONS: { mode: SortMode; label: string }[] = [
+  { mode: 'author', label: 'Author' },
+  { mode: 'title', label: 'Title' },
+  { mode: 'mainClass', label: 'Class' },
+  { mode: 'section', label: 'Section' },
+  { mode: 'classification', label: 'Division' },
+];
 
 export default function LibraryScreen() {
   const router = useRouter();
@@ -21,7 +30,7 @@ export default function LibraryScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      setBooks(getAllCopies(sortMode));
+      setBooks(getAllCopies(sortMode as CopySortMode));
     }, [sortMode])
   );
 
@@ -76,14 +85,14 @@ export default function LibraryScreen() {
       {!searchQuery.trim() && (
         <View style={styles.sortRow}>
           <Text style={styles.sortLabel}>Sort by</Text>
-          {(['author', 'title'] as SortMode[]).map((mode) => (
+          {SORT_OPTIONS.map(({ mode, label }) => (
             <TouchableOpacity
               key={mode}
               style={[styles.sortChip, sortMode === mode && styles.sortChipActive]}
               onPress={() => { setPreference('library_sort', mode); setSortMode(mode); }}
             >
               <Text style={[styles.sortChipText, sortMode === mode && styles.sortChipTextActive]}>
-                {mode === 'author' ? 'Author' : 'Title'}
+                {label}
               </Text>
             </TouchableOpacity>
           ))}
@@ -97,6 +106,7 @@ export default function LibraryScreen() {
         renderItem={({ item }) => (
           <BookRow
             book={item}
+            sortMode={sortMode}
             availability={availabilityMap.get(item.recordId) ?? { total: 1, available: item.isOnLoan ? 0 : 1 }}
             onPress={() => router.push(`/library/${item.id}`)}
           />
@@ -145,9 +155,15 @@ function availBadge(avail: { total: number; available: number }, isOnLoan: boole
   return null; // all available — no badge needed
 }
 
-function BookRow({ book, availability, onPress }: { book: BookCopyWithDetails; availability: { total: number; available: number }; onPress: () => void }) {
+function BookRow({ book, sortMode, availability, onPress }: { book: BookCopyWithDetails; sortMode: SortMode; availability: { total: number; available: number }; onPress: () => void }) {
+  // Show the classification code at the depth being sorted by; at division
+  // level include the Level 4 suffix so the chip reads like a spine label.
+  const levelCode =
+    sortMode === 'classification' ? `${book.division?.code ?? ''}${book.suffix ? ` ${book.suffix}` : ''}` :
+    sortMode === 'section' ? book.section?.code ?? '' :
+    book.mainClass?.code ?? '';
   const callCode = book.division
-    ? `${book.mainClass?.code ?? ''} ${book.record.sortAuthor?.slice(0, 3).toUpperCase() ?? ''}`.trim()
+    ? `${levelCode} ${book.record.sortAuthor?.slice(0, 3).toUpperCase() ?? ''}`.trim()
     : null;
 
   const badge = availBadge(availability, book.isOnLoan);
@@ -187,7 +203,7 @@ const styles = StyleSheet.create({
   heading: { fontSize: 34, fontWeight: '600', color: colors.text, letterSpacing: -0.3, fontFamily: fonts.serif },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, margin: spacing.md, marginBottom: spacing.sm, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.border },
   searchInput: { flex: 1, fontSize: 16, color: colors.text },
-  sortRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm },
+  sortRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm },
   sortLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '500' },
   sortChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   sortChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },

@@ -13,10 +13,11 @@ import { getCopyById, updateBookCopy, deleteBookCopy, getRecordCopySummary } fro
 import { getLoanHistoryForCopy, createLoan, returnLoan } from '../../src/database/queries/loans';
 import { getAllContacts, createContact } from '../../src/database/queries/contacts';
 import { getHoldsForRecord, addHold, removeHold } from '../../src/database/queries/holds';
+import { RFFC_SUFFIXES, RFFC_TAGS } from '../../src/data/rffcClassifications';
 import type { HoldWithContact } from '../../src/database/queries/holds';
 import {
   updateBookLoanStatus, getMyLibraries, getLibraryIdsForCopy,
-  upsertBookInLibrary, removeBookFromLibrary,
+  upsertBookInLibrary, removeBookFromLibrary, removeBookFromAllLibraries,
 } from '../../src/services/library';
 import type { Library } from '../../src/services/library';
 import type { BookCopyWithDetails, LoanWithDetails, Contact } from '../../src/types';
@@ -42,6 +43,7 @@ export default function BookDetailScreen() {
   const [holdModalVisible, setHoldModalVisible] = useState(false);
   const [holdContactSearch, setHoldContactSearch] = useState('');
   const [holdContacts, setHoldContacts] = useState<Contact[]>([]);
+  const [level4Expanded, setLevel4Expanded] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -64,6 +66,20 @@ export default function BookDetailScreen() {
     }
     getMyLibraries().then(setMyLibraries).catch(() => {});
     getLibraryIdsForCopy(copyId).then(setMemberLibraryIds).catch(() => {});
+  }
+
+  function handleSuffixToggle(code: string) {
+    if (!book) return;
+    const next = book.suffix === code ? null : code;
+    updateBookCopy(book.id, { suffix: next });
+    setBook((prev) => prev ? { ...prev, suffix: next } : prev);
+  }
+
+  function handleTagToggle(tag: string) {
+    if (!book) return;
+    const next = book.tags.includes(tag) ? book.tags.filter((t) => t !== tag) : [...book.tags, tag];
+    updateBookCopy(book.id, { tags: next });
+    setBook((prev) => prev ? { ...prev, tags: next } : prev);
   }
 
   function handleRating(star: number) {
@@ -169,21 +185,39 @@ export default function BookDetailScreen() {
       Alert.alert('Cannot Delete', 'This copy is currently on loan. Return it before deleting.');
       return;
     }
+    if (memberLibraryIds.length > 0) {
+      const shelfLabel = memberLibraryIds.length === 1 ? 'one of your shelves' : `${memberLibraryIds.length} of your shelves`;
+      Alert.alert(
+        'Delete Copy',
+        `Delete this copy? If it is the last copy, the book record will also be removed.\n\nThis book is on ${shelfLabel}. Remove it from your shelves too?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete, Keep on Shelves', onPress: () => performDelete(false) },
+          { text: 'Delete & Remove', style: 'destructive', onPress: () => performDelete(true) },
+        ]
+      );
+      return;
+    }
     Alert.alert('Delete Copy', 'Delete this copy? If it is the last copy, the book record will also be removed.', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          try {
-            deleteBookCopy(book.id);
-            router.back();
-          } catch {
-            Alert.alert('Error', 'Could not delete this copy. Please try again.');
-          }
-        },
-      },
+      { text: 'Delete', style: 'destructive', onPress: () => performDelete(false) },
     ]);
+  }
+
+  function performDelete(removeFromShelves: boolean) {
+    if (!book) return;
+    try {
+      deleteBookCopy(book.id);
+    } catch {
+      Alert.alert('Error', 'Could not delete this copy. Please try again.');
+      return;
+    }
+    if (removeFromShelves) {
+      removeBookFromAllLibraries(book.id).catch(() => {
+        Alert.alert('Shelf Removal Failed', 'The copy was deleted from your library, but it could not be removed from your shelves. Check your connection.');
+      });
+    }
+    router.back();
   }
 
   function openHoldModal() {
@@ -229,9 +263,52 @@ export default function BookDetailScreen() {
         {book.division && (
           <View style={styles.classCard}>
             <Ionicons name="layers-outline" size={16} color={colors.primary} />
-            <Text style={styles.classText} numberOfLines={2}>
-              {book.mainClass?.code} {book.mainClass?.name} › {book.section?.code} {book.section?.name} › {book.division.code} {book.division.name}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.classText} numberOfLines={2}>
+                {book.mainClass?.code} {book.mainClass?.name} › {book.section?.code} {book.section?.name} › {book.division.code} {book.division.name}
+              </Text>
+              {(book.suffix || book.tags.length > 0) && (
+                <Text style={styles.callNumberText}>
+                  {book.division.code}{book.suffix ? ` ${book.suffix}` : ''}{book.tags.length ? ` , ${book.tags.join(', ')}` : ''}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        <TouchableOpacity style={styles.level4Toggle} onPress={() => setLevel4Expanded((v) => !v)}>
+          <Ionicons name={level4Expanded ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textSecondary} />
+          <Text style={styles.level4ToggleText}>Format & Tags</Text>
+          {!level4Expanded && (book.suffix || book.tags.length > 0) && (
+            <Text style={styles.level4Summary} numberOfLines={1}>
+              {[book.suffix, ...book.tags].filter(Boolean).join(' , ')}
             </Text>
+          )}
+        </TouchableOpacity>
+        {level4Expanded && (
+          <View style={styles.level4Body}>
+            <Text style={styles.level4Hint}>Form / audience — at most one</Text>
+            <View style={styles.chipWrap}>
+              {RFFC_SUFFIXES.map((s) => {
+                const on = book.suffix === s.code;
+                return (
+                  <TouchableOpacity key={s.code} style={[styles.chip, on && styles.chipOn]} onPress={() => handleSuffixToggle(s.code)}>
+                    <Text style={[styles.chipText, on && styles.chipTextOn]}>{s.code} {s.short}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={styles.level4Hint}>Tags — secondary genres only</Text>
+            <View style={styles.chipWrap}>
+              {[...new Set([...RFFC_TAGS, ...book.tags])].map((t) => {
+                const on = book.tags.includes(t);
+                return (
+                  <TouchableOpacity key={t} style={[styles.chip, on && styles.chipOn]} onPress={() => handleTagToggle(t)}>
+                    <Text style={[styles.chipText, on && styles.chipTextOn]}>{t}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         )}
 
@@ -594,6 +671,17 @@ const styles = StyleSheet.create({
   copyLabel: { fontSize: 12, color: colors.primary, fontWeight: '600' },
   classCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.primaryLight, borderRadius: radius.md, padding: spacing.md },
   classText: { flex: 1, fontSize: 13, color: colors.primary },
+  callNumberText: { fontSize: 12, color: colors.primary, fontStyle: 'italic', marginTop: 2 },
+  level4Toggle: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  level4ToggleText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  level4Summary: { flex: 1, fontSize: 12, color: colors.primary, marginLeft: spacing.xs },
+  level4Body: { gap: spacing.xs },
+  level4Hint: { fontSize: 12, color: colors.textSecondary },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  chip: { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  chipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { fontSize: 12, color: colors.text },
+  chipTextOn: { color: '#fff', fontWeight: '600' },
   availBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, paddingHorizontal: 13, paddingVertical: 10, borderWidth: 1 },
   availBannerOk: { backgroundColor: '#EAF0DA', borderColor: '#CADBA8' },
   availBannerOut: { backgroundColor: '#FBE6E2', borderColor: '#EBC4BD' },

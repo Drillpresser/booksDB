@@ -43,6 +43,10 @@ export interface BookCopy {
   recordId: string;
   copyNumber: number;
   divisionId: string | null;
+  // RFFC Level 4: one optional form/audience suffix (e.g. '–a') and
+  // lowercase secondary-genre tags (e.g. ['scifi'])
+  suffix: string | null;
+  tags: string[];
   personalRating: number | null;
   notes: string | null;
   dateAdded: string;

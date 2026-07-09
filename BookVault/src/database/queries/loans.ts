@@ -1,4 +1,5 @@
 import { getDB, generateId } from '../db';
+import { parseTags } from './books';
 import type { Loan, LoanWithDetails } from '../../types';
 
 function isOverdue(loan: { dateLent: string; expectedReturn: string | null; dateReturned: string | null }): boolean {
@@ -20,7 +21,7 @@ const LOAN_DETAIL_QUERY = `
     br.id AS br_id, br.title, br.authors, br.sort_author, br.isbn13,
     br.publisher, br.published_year, br.page_count, br.synopsis, br.cover_image,
     br.dewey_decimal, br.community_rating, br.community_rating_count, br.community_rating_fetched,
-    bc.id AS bc_id, bc.record_id, bc.copy_number, bc.division_id, bc.personal_rating, bc.notes AS bc_notes, bc.date_added
+    bc.id AS bc_id, bc.record_id, bc.copy_number, bc.division_id, bc.suffix, bc.tags, bc.personal_rating, bc.notes AS bc_notes, bc.date_added
   FROM loans l
   JOIN contacts c ON l.contact_id = c.id
   JOIN book_copies bc ON l.copy_id = bc.id
@@ -61,6 +62,8 @@ function rowToDetail(row: any): LoanWithDetails {
       recordId: row.record_id,
       copyNumber: row.copy_number,
       divisionId: row.division_id,
+      suffix: row.suffix ?? null,
+      tags: parseTags(row.tags),
       personalRating: row.personal_rating,
       notes: row.bc_notes,
       dateAdded: row.date_added,

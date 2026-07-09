@@ -5,23 +5,29 @@ let _db: SQLite.SQLiteDatabase | null = null;
 export function getDB(): SQLite.SQLiteDatabase {
   if (!_db) {
     _db = SQLite.openDatabaseSync('bookvault.db');
+    // foreign_keys is connection-scoped — must be set on every open
+    _db.execSync('PRAGMA foreign_keys = ON;');
     migrate(_db);
   }
   return _db;
 }
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 function migrate(db: SQLite.SQLiteDatabase) {
   const versionRow = db.getFirstSync('PRAGMA user_version') as any;
   const currentVersion: number = versionRow?.user_version ?? 0;
   if (currentVersion >= SCHEMA_VERSION) return;
 
+  // journal_mode cannot be changed inside a transaction; it persists in the db file
+  db.execSync('PRAGMA journal_mode = WAL;');
+
+  // All DDL runs in one transaction so a crash mid-migration can't leave
+  // user_version behind a partially applied schema.
+  db.withTransactionSync(() => {
+
   if (currentVersion < 1) {
   db.execSync(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA foreign_keys = ON;
-
     CREATE TABLE IF NOT EXISTS main_classes (
       id TEXT PRIMARY KEY,
       code TEXT NOT NULL,
@@ -127,6 +133,17 @@ function migrate(db: SQLite.SQLiteDatabase) {
     `);
     db.runSync(`PRAGMA user_version = 4`);
   }
+
+  // RFFC Level 4: one optional form/audience suffix and secondary-genre tags per copy
+  if (currentVersion < 5) {
+    db.execSync(`
+      ALTER TABLE book_copies ADD COLUMN suffix TEXT;
+      ALTER TABLE book_copies ADD COLUMN tags TEXT NOT NULL DEFAULT '[]';
+    `);
+    db.runSync(`PRAGMA user_version = 5`);
+  }
+
+  });
 }
 
 export function generateId(): string {

@@ -14,6 +14,7 @@ import { lookupBookWithClaude, fillMissingFields, suggestClassification, getApiK
 import { insertBookRecord, insertBookCopy, saveCoverImage, getRecordByIsbn, getCopyCountForRecord } from '../../src/database/queries/books';
 import { generateId, getDB } from '../../src/database/db';
 import { getAllMainClasses, getSectionsByMainClass, getDivisionsBySection } from '../../src/database/queries/classifications';
+import { RFFC_SUFFIXES, RFFC_TAGS } from '../../src/data/rffcClassifications';
 import { getMyLibraries, syncBookToLibraries } from '../../src/services/library';
 import type { Library } from '../../src/services/library';
 import type { BookLookupResult, MainClass, Section, Division } from '../../src/types';
@@ -27,6 +28,10 @@ export default function AddBookScreen() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<BookLookupResult>>({});
   const [selectedDivisionId, setSelectedDivisionId] = useState<string | null>(null);
+  const [selectedSuffix, setSelectedSuffix] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [customTag, setCustomTag] = useState('');
+  const [level4Expanded, setLevel4Expanded] = useState(false);
   const [classPickerVisible, setClassPickerVisible] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const scanned = useRef(false);
@@ -147,6 +152,9 @@ export default function AddBookScreen() {
         setSelectedMainClass(mc);
         setSelectedDivisionId(suggestion.divisionId);
       }
+      if (suggestion.suffix) setSelectedSuffix(suggestion.suffix);
+      if (suggestion.tags.length > 0) setSelectedTags(suggestion.tags);
+      if (suggestion.suffix || suggestion.tags.length > 0) setLevel4Expanded(true);
     } catch {
       Alert.alert('Error', 'Could not get a classification suggestion. Please try again.');
     } finally {
@@ -212,6 +220,8 @@ export default function AddBookScreen() {
             recordId,
             copyNumber,
             divisionId: selectedDivisionId,
+            suffix: selectedSuffix,
+            tags: selectedTags,
             personalRating: null,
             notes: null,
             dateAdded: new Date().toISOString(),
@@ -398,6 +408,23 @@ export default function AddBookScreen() {
     ? `${selectedMainClass?.code} › ${selectedSection?.code} › ${selectedDivision?.code} — ${selectedDivision?.name}`
     : 'Unclassified';
 
+  // Full RFFC call number: CODE –suffix , tags
+  const callNumber = selectedDivision
+    ? `${selectedDivision.code}${selectedSuffix ? ` ${selectedSuffix}` : ''}${selectedTags.length ? ` , ${selectedTags.join(', ')}` : ''}`
+    : null;
+  const tagOptions = [...new Set([...RFFC_TAGS, ...selectedTags])];
+
+  function toggleTag(tag: string) {
+    setSelectedTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
+  }
+
+  function addCustomTag() {
+    const tag = customTag.trim().toLowerCase();
+    if (!tag) return;
+    if (!selectedTags.includes(tag)) setSelectedTags((prev) => [...prev, tag]);
+    setCustomTag('');
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.form}>
@@ -434,6 +461,59 @@ export default function AddBookScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        <TouchableOpacity style={styles.level4Toggle} onPress={() => setLevel4Expanded((v) => !v)}>
+          <Ionicons name={level4Expanded ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textSecondary} />
+          <Text style={styles.level4ToggleText}>Format & Tags</Text>
+          {!level4Expanded && (selectedSuffix || selectedTags.length > 0) && (
+            <Text style={styles.level4Summary} numberOfLines={1}>
+              {[selectedSuffix, ...selectedTags].filter(Boolean).join(' , ')}
+            </Text>
+          )}
+        </TouchableOpacity>
+        {level4Expanded && (
+          <>
+            <Text style={styles.level4Hint}>Form / audience — at most one</Text>
+            <View style={styles.chipWrap}>
+              {RFFC_SUFFIXES.map((s) => {
+                const on = selectedSuffix === s.code;
+                return (
+                  <TouchableOpacity key={s.code} style={[styles.chip, on && styles.chipOn]} onPress={() => setSelectedSuffix(on ? null : s.code)}>
+                    <Text style={[styles.chipText, on && styles.chipTextOn]}>{s.code} {s.short}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={styles.level4Hint}>Tags — secondary genres only</Text>
+            <View style={styles.chipWrap}>
+              {tagOptions.map((t) => {
+                const on = selectedTags.includes(t);
+                return (
+                  <TouchableOpacity key={t} style={[styles.chip, on && styles.chipOn]} onPress={() => toggleTag(t)}>
+                    <Text style={[styles.chipText, on && styles.chipTextOn]}>{t}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.customTagRow}>
+              <TextInput
+                style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                placeholder="Add custom tag"
+                value={customTag}
+                onChangeText={setCustomTag}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="done"
+                onSubmitEditing={addCustomTag}
+                placeholderTextColor={colors.textSecondary}
+              />
+              <TouchableOpacity style={styles.customTagAdd} onPress={addCustomTag}>
+                <Ionicons name="add" size={20} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+            {callNumber && <Text style={styles.callNumber}>Call number: {callNumber}</Text>}
+          </>
+        )}
 
         {myLibraries.length > 0 && (
           <>
@@ -548,6 +628,18 @@ const styles = StyleSheet.create({
   classRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   classPicker: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   classPickerText: { flex: 1, fontSize: 15, color: colors.text },
+  level4Toggle: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  level4ToggleText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  level4Summary: { flex: 1, fontSize: 12, color: colors.primary, marginLeft: spacing.xs },
+  level4Hint: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  chip: { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  chipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { fontSize: 12, color: colors.text },
+  chipTextOn: { color: '#fff', fontWeight: '600' },
+  customTagRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  customTagAdd: { width: 40, height: 40, borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  callNumber: { fontSize: 13, color: colors.textSecondary, fontStyle: 'italic' },
   libraryChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   libraryChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   libraryChipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
