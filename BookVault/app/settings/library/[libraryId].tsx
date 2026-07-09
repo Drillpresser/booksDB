@@ -10,9 +10,9 @@ import { colors, spacing, radius } from '../../../src/theme';
 import {
   getLibraryById, getCardsForLibrary, getRequestsForLibrary,
   updateLibrary, deleteLibrary, updateCardStatus, deleteCard,
-  createInvite, updateRequestStatus,
+  createInvite, updateRequestStatus, getBooksInLibrary, removeBookFromLibrary,
 } from '../../../src/services/library';
-import type { Library, LibraryCard, BookRequest } from '../../../src/services/library';
+import type { Library, LibraryCard, BookRequest, LibraryBook } from '../../../src/services/library';
 import { supabase } from '../../../src/lib/supabase';
 
 export default function ManageLibraryScreen() {
@@ -22,6 +22,7 @@ export default function ManageLibraryScreen() {
   const [library, setLibrary] = useState<Library | null>(null);
   const [cards, setCards] = useState<LibraryCard[]>([]);
   const [requests, setRequests] = useState<BookRequest[]>([]);
+  const [books, setBooks] = useState<LibraryBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
@@ -39,10 +40,11 @@ export default function ManageLibraryScreen() {
   async function load() {
     setLoading(true);
     try {
-      const [lib, c, r] = await Promise.all([
+      const [lib, c, r, b] = await Promise.all([
         getLibraryById(libraryId!),
         getCardsForLibrary(libraryId!),
         getRequestsForLibrary(libraryId!),
+        getBooksInLibrary(libraryId!),
       ]);
       if (lib) {
         setLibrary(lib);
@@ -52,6 +54,7 @@ export default function ManageLibraryScreen() {
       }
       setCards(c);
       setRequests(r);
+      setBooks(b);
     } catch {
       setLibrary(null);
     } finally {
@@ -126,6 +129,24 @@ export default function ManageLibraryScreen() {
     } catch {
       Alert.alert('Error', 'Could not update card status.');
     }
+  }
+
+  function handleRemoveBook(b: LibraryBook) {
+    Alert.alert('Remove Book', `Remove "${b.title}" from this shelf? It stays in your personal library.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await removeBookFromLibrary(libraryId!, b.copyId);
+            setBooks((prev) => prev.filter((x) => x.id !== b.id));
+          } catch {
+            Alert.alert('Error', 'Could not remove the book from this shelf.');
+          }
+        },
+      },
+    ]);
   }
 
   async function handleRequestAction(requestId: string, action: 'approved' | 'denied' | 'fulfilled') {
@@ -342,6 +363,28 @@ export default function ManageLibraryScreen() {
                       <Text style={styles.denyRequestBtnText}>Deny</Text>
                     </TouchableOpacity>
                   </View>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {books.length > 0 && (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Books ({books.length})</Text>
+              {books.map((b) => (
+                <View key={b.id} style={styles.cardRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardName} numberOfLines={2}>{b.title}</Text>
+                    {b.authors.length > 0 ? (
+                      <Text style={styles.cardMessage} numberOfLines={1}>{b.authors.join(', ')}</Text>
+                    ) : null}
+                  </View>
+                  <TouchableOpacity style={styles.removeCardBtn} onPress={() => handleRemoveBook(b)}>
+                    <Text style={styles.removeCardBtnText}>Remove</Text>
+                  </TouchableOpacity>
                 </View>
               ))}
             </View>
