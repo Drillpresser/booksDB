@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   StyleSheet, Alert, TextInput, Modal, FlatList, Platform, StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -10,6 +11,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fonts, spacing, radius } from '../../src/theme';
 import { CommunityRatings } from '../../src/components/CommunityRatings';
 import { getCopyById, updateBookCopy, deleteBookCopy, getRecordCopySummary } from '../../src/database/queries/books';
+import { getAllMainClasses, getSectionsByMainClass, getDivisionsBySection } from '../../src/database/queries/classifications';
+import { suggestClassification, getApiKey } from '../../src/services/claude';
 import { getLoanHistoryForCopy, createLoan, returnLoan } from '../../src/database/queries/loans';
 import { getAllContacts, createContact } from '../../src/database/queries/contacts';
 import { getHoldsForRecord, addHold, removeHold } from '../../src/database/queries/holds';
@@ -20,7 +23,7 @@ import {
   upsertBookInLibrary, removeBookFromLibrary, removeBookFromAllLibraries,
 } from '../../src/services/library';
 import type { Library } from '../../src/services/library';
-import type { BookCopyWithDetails, LoanWithDetails, Contact } from '../../src/types';
+import type { BookCopyWithDetails, LoanWithDetails, Contact, MainClass, Section, Division } from '../../src/types';
 
 export default function BookDetailScreen() {
   const { copyId } = useLocalSearchParams<{ copyId: string }>();
@@ -44,6 +47,15 @@ export default function BookDetailScreen() {
   const [holdContactSearch, setHoldContactSearch] = useState('');
   const [holdContacts, setHoldContacts] = useState<Contact[]>([]);
   const [level4Expanded, setLevel4Expanded] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [classPickerVisible, setClassPickerVisible] = useState(false);
+  const [classPickerLevel, setClassPickerLevel] = useState<'main' | 'section' | 'division'>('main');
+  const [classPickerMCs, setClassPickerMCs] = useState<MainClass[]>([]);
+  const [classPickerSecs, setClassPickerSecs] = useState<Section[]>([]);
+  const [classPickerDivs, setClassPickerDivs] = useState<Division[]>([]);
+  const [classPickerMC, setClassPickerMC] = useState<MainClass | null>(null);
+  const [classPickerSec, setClassPickerSec] = useState<Section | null>(null);
+  const [classifying, setClassifying] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -66,6 +78,100 @@ export default function BookDetailScreen() {
     }
     getMyLibraries().then(setMyLibraries).catch(() => {});
     getLibraryIdsForCopy(copyId).then(setMemberLibraryIds).catch(() => {});
+  }
+
+  async function handleRemoveFromShelves() {
+    setRemoving(true);
+    try {
+      await removeBookFromAllLibraries(copyId!);
+    } catch {
+      // no-op if not on any shelves
+    } finally {
+      setRemoving(false);
+    }
+    router.back();
+  }
+
+  function applyClassification(div: Division, sec: Section, mc: MainClass) {
+    if (!book) return;
+    updateBookCopy(book.id, { divisionId: div.id });
+    setBook((prev) => prev ? { ...prev, division: div, section: sec, mainClass: mc, divisionId: div.id } : prev);
+    if (memberLibraryIds.length > 0) {
+      const isbn = book.record.isbn13;
+      const coverImage = isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg` : null;
+      memberLibraryIds.forEach((libId) => {
+        upsertBookInLibrary(libId, {
+          copyId: book.id,
+          recordId: book.record.id,
+          title: book.record.title,
+          authors: book.record.authors,
+          sortAuthor: book.record.sortAuthor,
+          isbn13: isbn,
+          publisher: book.record.publisher,
+          publishedYear: book.record.publishedYear,
+          pageCount: book.record.pageCount,
+          synopsis: book.record.synopsis,
+          coverImage,
+          deweyDecimal: book.record.deweyDecimal,
+          copyNumber: book.copyNumber,
+          divisionCode: div.code,
+          divisionName: div.name,
+          sectionCode: sec.code,
+          sectionName: sec.name,
+          mainClassCode: mc.code,
+          mainClassName: mc.name,
+          isOnLoan: book.isOnLoan,
+        }).catch(() => {});
+      });
+    }
+  }
+
+  function handleOpenClassPicker() {
+    setClassPickerMCs(getAllMainClasses());
+    setClassPickerSecs([]);
+    setClassPickerDivs([]);
+    setClassPickerMC(null);
+    setClassPickerSec(null);
+    setClassPickerLevel('main');
+    setClassPickerVisible(true);
+  }
+
+  async function handleSuggestClassification() {
+    if (!book) return;
+    const hasKey = await getApiKey();
+    if (!hasKey) {
+      Alert.alert('No API Key', 'Add your Anthropic API key in Settings to use Claude.');
+      return;
+    }
+    setClassifying(true);
+    try {
+      const allMC = getAllMainClasses();
+      const allSec = allMC.flatMap((m) => getSectionsByMainClass(m.id));
+      const allDiv = allSec.flatMap((s) => getDivisionsBySection(s.id));
+      const suggestion = await suggestClassification(
+        { title: book.record.title, authors: book.record.authors, synopsis: book.record.synopsis, deweyDecimal: book.record.deweyDecimal },
+        { mainClasses: allMC, sections: allSec, divisions: allDiv }
+      );
+      if (suggestion.divisionId) {
+        const div = allDiv.find((d) => d.id === suggestion.divisionId) ?? null;
+        const sec = div ? allSec.find((s) => s.id === div.sectionId) ?? null : null;
+        const mc = sec ? allMC.find((m) => m.id === sec.mainClassId) ?? null : null;
+        if (div && sec && mc) applyClassification(div, sec, mc);
+      }
+      if (suggestion.suffix !== null) {
+        updateBookCopy(book.id, { suffix: suggestion.suffix });
+        setBook((prev) => prev ? { ...prev, suffix: suggestion.suffix } : prev);
+      }
+      if (suggestion.tags.length > 0) {
+        updateBookCopy(book.id, { tags: suggestion.tags });
+        setBook((prev) => prev ? { ...prev, tags: suggestion.tags } : prev);
+        setLevel4Expanded(true);
+      }
+    } catch {
+      Alert.alert('Error', 'Could not get a classification suggestion. Please try again.');
+    } finally {
+      setClassifying(false);
+    }
   }
 
   function handleSuffixToggle(code: string) {
@@ -229,7 +335,31 @@ export default function BookDetailScreen() {
   if (!book) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.center}><Text style={styles.notFound}>Book not found.</Text></View>
+        <View style={styles.center}>
+          <Ionicons name="book-outline" size={48} color={colors.border} />
+          <Text style={styles.notFound}>Book not found.</Text>
+          <Text style={styles.notFoundSub}>
+            This copy was deleted from your library but may still be on a shelf.
+          </Text>
+          <TouchableOpacity
+            style={styles.removeFromShelvesBtn}
+            onPress={handleRemoveFromShelves}
+            disabled={removing}
+          >
+            {removing
+              ? <ActivityIndicator color={colors.danger} size="small" />
+              : (
+                <>
+                  <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                  <Text style={styles.removeFromShelvesBtnText}>Remove from All Shelves</Text>
+                </>
+              )
+            }
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.back()} style={{ marginTop: spacing.sm }}>
+            <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -260,7 +390,7 @@ export default function BookDetailScreen() {
           </View>
         </View>
 
-        {book.division && (
+        {book.division ? (
           <View style={styles.classCard}>
             <Ionicons name="layers-outline" size={16} color={colors.primary} />
             <View style={{ flex: 1 }}>
@@ -273,7 +403,16 @@ export default function BookDetailScreen() {
                 </Text>
               )}
             </View>
+            <TouchableOpacity onPress={handleOpenClassPicker} hitSlop={8}>
+              <Ionicons name="pencil-outline" size={18} color={colors.primary} />
+            </TouchableOpacity>
           </View>
+        ) : (
+          <TouchableOpacity style={styles.classifyBtn} onPress={handleOpenClassPicker}>
+            <Ionicons name="layers-outline" size={16} color={colors.textSecondary} />
+            <Text style={styles.classifyBtnText}>Classify this book</Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+          </TouchableOpacity>
         )}
 
         <TouchableOpacity style={styles.level4Toggle} onPress={() => setLevel4Expanded((v) => !v)}>
@@ -311,6 +450,18 @@ export default function BookDetailScreen() {
             </View>
           </View>
         )}
+
+        <TouchableOpacity style={styles.claudeBtn} onPress={handleSuggestClassification} disabled={classifying}>
+          {classifying
+            ? <ActivityIndicator color={colors.primary} size="small" />
+            : (
+              <>
+                <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
+                <Text style={styles.claudeBtnText}>Ask Claude to suggest classification</Text>
+              </>
+            )
+          }
+        </TouchableOpacity>
 
         {copySummary && copySummary.total > 1 && (
           <View style={[
@@ -476,6 +627,86 @@ export default function BookDetailScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal visible={classPickerVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => {
+                if (classPickerLevel === 'division') setClassPickerLevel('section');
+                else if (classPickerLevel === 'section') setClassPickerLevel('main');
+                else setClassPickerVisible(false);
+              }}
+            >
+              <Ionicons name="chevron-back" size={22} color={colors.primary} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              {classPickerLevel === 'main' ? 'Main Class' : classPickerLevel === 'section' ? 'Section' : 'Division'}
+            </Text>
+            <TouchableOpacity onPress={() => setClassPickerVisible(false)}>
+              <Ionicons name="close" size={26} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          {classPickerLevel === 'main' && (
+            <FlatList
+              data={classPickerMCs}
+              keyExtractor={(m) => m.id}
+              renderItem={({ item: mc }) => (
+                <TouchableOpacity
+                  style={styles.pickerRow}
+                  onPress={() => {
+                    setClassPickerMC(mc);
+                    setClassPickerSecs(getSectionsByMainClass(mc.id));
+                    setClassPickerLevel('section');
+                  }}
+                >
+                  <Text style={styles.pickerCode}>{mc.code}</Text>
+                  <Text style={styles.pickerName}>{mc.name}</Text>
+                  <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            />
+          )}
+          {classPickerLevel === 'section' && (
+            <FlatList
+              data={classPickerSecs}
+              keyExtractor={(s) => s.id}
+              renderItem={({ item: sec }) => (
+                <TouchableOpacity
+                  style={styles.pickerRow}
+                  onPress={() => {
+                    setClassPickerSec(sec);
+                    setClassPickerDivs(getDivisionsBySection(sec.id));
+                    setClassPickerLevel('division');
+                  }}
+                >
+                  <Text style={styles.pickerCode}>{sec.code}</Text>
+                  <Text style={styles.pickerName}>{sec.name}</Text>
+                  <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            />
+          )}
+          {classPickerLevel === 'division' && (
+            <FlatList
+              data={classPickerDivs}
+              keyExtractor={(d) => d.id}
+              renderItem={({ item: div }) => (
+                <TouchableOpacity
+                  style={styles.pickerRow}
+                  onPress={() => {
+                    applyClassification(div, classPickerSec!, classPickerMC!);
+                    setClassPickerVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerCode}>{div.code}</Text>
+                  <Text style={styles.pickerName}>{div.name}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
 
       <Modal visible={holdModalVisible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -659,6 +890,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   notFound: { fontSize: 16, color: colors.textSecondary },
+  notFoundSub: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs, marginHorizontal: spacing.lg },
+  removeFromShelvesBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.danger, borderRadius: radius.md },
+  removeFromShelvesBtnText: { color: colors.danger, fontSize: 14, fontWeight: '600' },
+  classifyBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
+  classifyBtnText: { flex: 1, fontSize: 14, color: colors.textSecondary },
+  claudeBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.primaryLight },
+  claudeBtnText: { flex: 1, fontSize: 13, color: colors.primary, fontWeight: '500' },
+  pickerRow: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderColor: colors.border, gap: spacing.md },
+  pickerCode: { fontFamily: fonts.mono, fontSize: 13, color: colors.primary, width: 80 },
+  pickerName: { flex: 1, fontSize: 15, color: colors.text },
   scroll: { padding: spacing.md, gap: spacing.md },
   heroRow: { flexDirection: 'row', gap: spacing.md },
   cover: { width: 92, height: 132, borderRadius: 8, overflow: 'hidden', position: 'relative', justifyContent: 'center', alignItems: 'center', padding: 10 },
