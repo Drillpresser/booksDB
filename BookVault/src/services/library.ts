@@ -131,7 +131,9 @@ export async function setMyDisplayName(name: string): Promise<void> {
 // ── My Libraries ───────────────────────────────────────────────────────────
 
 export async function getMyLibraries(): Promise<Library[]> {
-  const { data } = await supabase.from('libraries').select('*').order('created_at', { ascending: true });
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase.from('libraries').select('*').eq('owner_id', user.id).order('created_at', { ascending: true });
   return (data ?? []).map(toLibrary);
 }
 
