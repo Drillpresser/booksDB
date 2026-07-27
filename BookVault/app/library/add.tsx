@@ -550,10 +550,12 @@ export default function AddBookScreen() {
           </>
         )}
 
-        <TouchableOpacity style={styles.claudeBtn} onPress={handleAskClaude} disabled={loading}>
-          <Ionicons name="sparkles-outline" size={18} color={colors.primary} style={{ marginRight: spacing.xs }} />
-          <Text style={styles.claudeBtnText}>Ask Claude to fill missing fields</Text>
-        </TouchableOpacity>
+        {hasApiKey && (
+          <TouchableOpacity style={styles.claudeBtn} onPress={handleAskClaude} disabled={loading}>
+            <Ionicons name="sparkles-outline" size={18} color={colors.primary} style={{ marginRight: spacing.xs }} />
+            <Text style={styles.claudeBtnText}>Ask Claude to fill missing fields</Text>
+          </TouchableOpacity>
+        )}
         {hasApiKey && (
           <TouchableOpacity style={styles.claudeBtn} onPress={handleSuggestClassification} disabled={loading}>
             <Ionicons name="sparkles-outline" size={18} color={colors.primary} style={{ marginRight: spacing.xs }} />
