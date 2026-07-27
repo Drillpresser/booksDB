@@ -41,6 +41,12 @@
           "cameraPermission": "BookHoarder uses your camera to scan book barcodes."
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "BookHoarder uses your photo library so you can set a book's cover image."
+        }
+      ],
       "expo-secure-store",
       "expo-web-browser",
       "@react-native-community/datetimepicker"
