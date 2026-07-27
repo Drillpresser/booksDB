@@ -57,6 +57,7 @@ export default function BookDetailScreen() {
   const [classPickerMC, setClassPickerMC] = useState<MainClass | null>(null);
   const [classPickerSec, setClassPickerSec] = useState<Section | null>(null);
   const [classifying, setClassifying] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editAuthors, setEditAuthors] = useState('');
@@ -87,6 +88,7 @@ export default function BookDetailScreen() {
     }
     getMyLibraries().then(setMyLibraries).catch(() => {});
     getLibraryIdsForCopy(copyId).then(setMemberLibraryIds).catch(() => {});
+    getApiKey().then((k) => setHasApiKey(!!k)).catch(() => setHasApiKey(false));
   }
 
   async function handleRemoveFromShelves() {
@@ -533,17 +535,19 @@ export default function BookDetailScreen() {
           </View>
         )}
 
-        <TouchableOpacity style={styles.claudeBtn} onPress={handleSuggestClassification} disabled={classifying}>
-          {classifying
-            ? <ActivityIndicator color={colors.primary} size="small" />
-            : (
-              <>
-                <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
-                <Text style={styles.claudeBtnText}>Ask Claude to suggest classification</Text>
-              </>
-            )
-          }
-        </TouchableOpacity>
+        {hasApiKey && (
+          <TouchableOpacity style={styles.claudeBtn} onPress={handleSuggestClassification} disabled={classifying}>
+            {classifying
+              ? <ActivityIndicator color={colors.primary} size="small" />
+              : (
+                <>
+                  <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
+                  <Text style={styles.claudeBtnText}>Ask Claude to suggest classification</Text>
+                </>
+              )
+            }
+          </TouchableOpacity>
+        )}
 
         {copySummary && copySummary.total > 1 && (
           <View style={[

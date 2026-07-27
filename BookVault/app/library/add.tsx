@@ -49,10 +49,12 @@ export default function AddBookScreen() {
   const [cameFromSearch, setCameFromSearch] = useState(false);
   const [myLibraries, setMyLibraries] = useState<Library[]>([]);
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   useEffect(() => {
     setMainClasses(getAllMainClasses());
     getMyLibraries().then(setMyLibraries).catch(() => {});
+    getApiKey().then((k) => setHasApiKey(!!k)).catch(() => setHasApiKey(false));
   }, []);
 
   async function handleSearch() {
@@ -552,10 +554,12 @@ export default function AddBookScreen() {
           <Ionicons name="sparkles-outline" size={18} color={colors.primary} style={{ marginRight: spacing.xs }} />
           <Text style={styles.claudeBtnText}>Ask Claude to fill missing fields</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.claudeBtn} onPress={handleSuggestClassification} disabled={loading}>
-          <Ionicons name="sparkles-outline" size={18} color={colors.primary} style={{ marginRight: spacing.xs }} />
-          <Text style={styles.claudeBtnText}>Ask Claude to suggest classification</Text>
-        </TouchableOpacity>
+        {hasApiKey && (
+          <TouchableOpacity style={styles.claudeBtn} onPress={handleSuggestClassification} disabled={loading}>
+            <Ionicons name="sparkles-outline" size={18} color={colors.primary} style={{ marginRight: spacing.xs }} />
+            <Text style={styles.claudeBtnText}>Ask Claude to suggest classification</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={[styles.btn, { marginTop: spacing.lg }]} onPress={handleSave} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Save Book</Text>}
