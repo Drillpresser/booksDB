@@ -10,7 +10,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fonts, spacing, radius } from '../../src/theme';
 import { CommunityRatings } from '../../src/components/CommunityRatings';
-import { getCopyById, updateBookCopy, deleteBookCopy, getRecordCopySummary } from '../../src/database/queries/books';
+import { getCopyById, updateBookCopy, updateBookRecord, deleteBookCopy, getRecordCopySummary } from '../../src/database/queries/books';
+import { deriveSortAuthor } from '../../src/services/bookLookup';
 import { getAllMainClasses, getSectionsByMainClass, getDivisionsBySection } from '../../src/database/queries/classifications';
 import { suggestClassification, getApiKey } from '../../src/services/claude';
 import { getLoanHistoryForCopy, createLoan, returnLoan } from '../../src/database/queries/loans';
@@ -56,6 +57,14 @@ export default function BookDetailScreen() {
   const [classPickerMC, setClassPickerMC] = useState<MainClass | null>(null);
   const [classPickerSec, setClassPickerSec] = useState<Section | null>(null);
   const [classifying, setClassifying] = useState(false);
+  const [editVisible, setEditVisible] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editAuthors, setEditAuthors] = useState('');
+  const [editPublisher, setEditPublisher] = useState('');
+  const [editYear, setEditYear] = useState('');
+  const [editPages, setEditPages] = useState('');
+  const [editSynopsis, setEditSynopsis] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -124,6 +133,76 @@ export default function BookDetailScreen() {
         }).catch(() => {});
       });
     }
+  }
+
+  function handleOpenEdit() {
+    if (!book) return;
+    setEditTitle(book.record.title);
+    setEditAuthors(book.record.authors.join(', '));
+    setEditPublisher(book.record.publisher ?? '');
+    setEditYear(book.record.publishedYear?.toString() ?? '');
+    setEditPages(book.record.pageCount?.toString() ?? '');
+    setEditSynopsis(book.record.synopsis ?? '');
+    setEditVisible(true);
+  }
+
+  function handleSaveEdit() {
+    if (!book) return;
+    const title = editTitle.trim();
+    if (!title) {
+      Alert.alert('Title Required', 'Please enter a book title.');
+      return;
+    }
+    const authors = editAuthors.split(',').map((a) => a.trim()).filter(Boolean);
+    const sortAuthor = deriveSortAuthor(authors);
+    const publisher = editPublisher.trim() || null;
+    const publishedYear = editYear.trim() ? (parseInt(editYear, 10) || null) : null;
+    const pageCount = editPages.trim() ? (parseInt(editPages, 10) || null) : null;
+    const synopsis = editSynopsis.trim() || null;
+
+    setSavingEdit(true);
+    try {
+      updateBookRecord(book.record.id, { title, authors, sortAuthor, publisher, publishedYear, pageCount, synopsis });
+    } catch {
+      setSavingEdit(false);
+      Alert.alert('Error', 'Could not save changes. Please try again.');
+      return;
+    }
+
+    const updatedRecord = { ...book.record, title, authors, sortAuthor, publisher, publishedYear, pageCount, synopsis };
+    setBook((prev) => prev ? { ...prev, record: updatedRecord } : prev);
+
+    if (memberLibraryIds.length > 0) {
+      const isbn = updatedRecord.isbn13;
+      const coverImage = isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg` : null;
+      memberLibraryIds.forEach((libId) => {
+        upsertBookInLibrary(libId, {
+          copyId: book.id,
+          recordId: updatedRecord.id,
+          title,
+          authors,
+          sortAuthor,
+          isbn13: isbn,
+          publisher,
+          publishedYear,
+          pageCount,
+          synopsis,
+          coverImage,
+          deweyDecimal: updatedRecord.deweyDecimal,
+          copyNumber: book.copyNumber,
+          divisionCode: book.division?.code ?? null,
+          divisionName: book.division?.name ?? null,
+          sectionCode: book.section?.code ?? null,
+          sectionName: book.section?.name ?? null,
+          mainClassCode: book.mainClass?.code ?? null,
+          mainClassName: book.mainClass?.name ?? null,
+          isOnLoan: book.isOnLoan,
+        }).catch(() => {});
+      });
+    }
+
+    setSavingEdit(false);
+    setEditVisible(false);
   }
 
   function handleOpenClassPicker() {
@@ -388,6 +467,9 @@ export default function BookDetailScreen() {
             {book.record.pageCount && <Text style={styles.meta}>{book.record.pageCount} pages</Text>}
             {book.copyNumber > 1 && <Text style={styles.copyLabel}>Copy {book.copyNumber}</Text>}
           </View>
+          <TouchableOpacity onPress={handleOpenEdit} hitSlop={8} style={styles.editIcon}>
+            <Ionicons name="pencil-outline" size={20} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
         {book.division ? (
@@ -627,6 +709,48 @@ export default function BookDetailScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal visible={editVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Edit Details</Text>
+            <TouchableOpacity onPress={() => setEditVisible(false)}>
+              <Ionicons name="close" size={26} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} keyboardShouldPersistTaps="handled">
+            <View style={{ gap: spacing.xs }}>
+              <Text style={styles.fieldLabel}>Title</Text>
+              <TextInput style={styles.modalInput} value={editTitle} onChangeText={setEditTitle} placeholder="Title" placeholderTextColor={colors.textSecondary} />
+            </View>
+            <View style={{ gap: spacing.xs }}>
+              <Text style={styles.fieldLabel}>Author(s)</Text>
+              <TextInput style={styles.modalInput} value={editAuthors} onChangeText={setEditAuthors} placeholder="Comma separated" placeholderTextColor={colors.textSecondary} autoCorrect={false} />
+            </View>
+            <View style={{ gap: spacing.xs }}>
+              <Text style={styles.fieldLabel}>Publisher</Text>
+              <TextInput style={styles.modalInput} value={editPublisher} onChangeText={setEditPublisher} placeholder="Publisher" placeholderTextColor={colors.textSecondary} />
+            </View>
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <View style={{ flex: 1, gap: spacing.xs }}>
+                <Text style={styles.fieldLabel}>Year</Text>
+                <TextInput style={styles.modalInput} value={editYear} onChangeText={setEditYear} placeholder="Year" keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
+              </View>
+              <View style={{ flex: 1, gap: spacing.xs }}>
+                <Text style={styles.fieldLabel}>Pages</Text>
+                <TextInput style={styles.modalInput} value={editPages} onChangeText={setEditPages} placeholder="Pages" keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
+              </View>
+            </View>
+            <View style={{ gap: spacing.xs }}>
+              <Text style={styles.fieldLabel}>Synopsis</Text>
+              <TextInput style={[styles.modalInput, { minHeight: 100, textAlignVertical: 'top' }]} value={editSynopsis} onChangeText={setEditSynopsis} placeholder="Synopsis" multiline placeholderTextColor={colors.textSecondary} />
+            </View>
+            <TouchableOpacity style={styles.lendBtn} onPress={handleSaveEdit} disabled={savingEdit}>
+              {savingEdit ? <ActivityIndicator color="#fff" /> : <Text style={styles.lendBtnText}>Save Changes</Text>}
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
 
       <Modal visible={classPickerVisible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -906,6 +1030,7 @@ const styles = StyleSheet.create({
   coverInsetBorder: { position: 'absolute', top: 6, left: 6, right: 6, bottom: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', borderRadius: 3 },
   coverPlaceholderTitle: { fontFamily: fonts.serif, fontWeight: '600', fontSize: 12, lineHeight: 16, color: 'rgba(250,243,224,0.96)', textAlign: 'center' },
   heroInfo: { flex: 1, gap: spacing.xs },
+  editIcon: { padding: spacing.xs, alignSelf: 'flex-start' },
   title: { fontSize: 21, fontWeight: '700', color: colors.text, fontFamily: fonts.serif, lineHeight: 26 },
   authors: { fontSize: 14, color: colors.textSecondary },
   meta: { fontSize: 13, color: colors.textSecondary },

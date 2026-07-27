@@ -46,6 +46,7 @@ export default function AddBookScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<BookLookupResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [cameFromSearch, setCameFromSearch] = useState(false);
   const [myLibraries, setMyLibraries] = useState<Library[]>([]);
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
 
@@ -71,6 +72,7 @@ export default function AddBookScreen() {
     setFormData({ ...result });
     const isbn = result.isbn13 ?? '';
     setIsbnInput(isbn);
+    setCameFromSearch(true);
     setMode('manual');
     if (isbn) handleIsbnLookup(isbn);
   }
@@ -298,6 +300,7 @@ export default function AddBookScreen() {
             if (scanned.current) return;
             scanned.current = true;
             setIsbnInput(data);
+            setCameFromSearch(false);
             setMode('manual');
             handleIsbnLookup(data);
           }}
@@ -392,7 +395,7 @@ export default function AddBookScreen() {
             <Ionicons name="search-outline" size={22} color="#fff" style={{ marginRight: spacing.sm }} />
             <Text style={styles.btnText}>Search by Title / Author</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.btn, { backgroundColor: colors.textSecondary }]} onPress={() => setMode('manual')}>
+          <TouchableOpacity style={[styles.btn, { backgroundColor: colors.textSecondary }]} onPress={() => { setCameFromSearch(false); setMode('manual'); }}>
             <Ionicons name="pencil-outline" size={22} color="#fff" style={{ marginRight: spacing.sm }} />
             <Text style={styles.btnText}>Enter Manually</Text>
           </TouchableOpacity>
@@ -428,9 +431,9 @@ export default function AddBookScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.form}>
-        <TouchableOpacity style={styles.backRow} onPress={() => setMode('choose')}>
+        <TouchableOpacity style={styles.backRow} onPress={() => setMode(cameFromSearch ? 'search' : 'choose')}>
           <Ionicons name="chevron-back" size={18} color={colors.primary} />
-          <Text style={styles.backRowText}>Choose different method</Text>
+          <Text style={styles.backRowText}>{cameFromSearch ? 'Back to results' : 'Choose different method'}</Text>
         </TouchableOpacity>
         <TextInput
           style={styles.input}
