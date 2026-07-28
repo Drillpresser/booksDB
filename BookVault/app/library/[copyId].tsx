@@ -16,6 +16,7 @@ import {
   saveLocalCoverImage, deleteCoverImage,
 } from '../../src/database/queries/books';
 import { deriveSortAuthor } from '../../src/services/bookLookup';
+import { upsertCommunityBook } from '../../src/services/communityCatalog';
 import { getAllMainClasses, getSectionsByMainClass, getDivisionsBySection } from '../../src/database/queries/classifications';
 import { suggestClassification, getApiKey } from '../../src/services/claude';
 import { getLoanHistoryForCopy, createLoan, returnLoan } from '../../src/database/queries/loans';
@@ -223,6 +224,23 @@ export default function BookDetailScreen() {
       suffix: editSuffix,
       tags: editTags,
     } : prev);
+
+    // Contribute the edited metadata to the shared catalog so other users
+    // adding this ISBN receive it. Only remote (http) covers can be shared;
+    // custom on-device covers stay local for now.
+    if (updatedRecord.isbn13) {
+      upsertCommunityBook({
+        isbn13: updatedRecord.isbn13,
+        title,
+        authors,
+        publisher,
+        publishedYear,
+        pageCount,
+        synopsis,
+        coverUrl: coverImage && /^https?:\/\//i.test(coverImage) ? coverImage : null,
+        deweyDecimal: updatedRecord.deweyDecimal,
+      }).catch(() => {});
+    }
 
     if (memberLibraryIds.length > 0) {
       const isbn = updatedRecord.isbn13;

@@ -16,6 +16,7 @@ import { generateId, getDB } from '../../src/database/db';
 import { getAllMainClasses, getSectionsByMainClass, getDivisionsBySection } from '../../src/database/queries/classifications';
 import { RFFC_SUFFIXES, RFFC_TAGS } from '../../src/data/rffcClassifications';
 import { getMyLibraries, syncBookToLibraries } from '../../src/services/library';
+import { upsertCommunityBook } from '../../src/services/communityCatalog';
 import type { Library } from '../../src/services/library';
 import type { BookLookupResult, MainClass, Section, Division } from '../../src/types';
 
@@ -239,6 +240,23 @@ export default function AddBookScreen() {
           FileSystem.deleteAsync(coverImage, { idempotent: true }).catch(() => {});
         }
         throw e;
+      }
+
+      // Contribute this book's metadata to the shared catalog so other users
+      // adding the same ISBN receive it. Fire-and-forget; ISBN-less books can't
+      // participate (the catalog is keyed by ISBN).
+      if (isbn) {
+        upsertCommunityBook({
+          isbn13: isbn,
+          title: formData.title!,
+          authors: formData.authors ?? [],
+          publisher: formData.publisher ?? null,
+          publishedYear: formData.publishedYear ?? null,
+          pageCount: formData.pageCount ?? null,
+          synopsis: formData.synopsis ?? null,
+          coverUrl: formData.coverUrl ? formData.coverUrl.replace(/^http:\/\//i, 'https://') : null,
+          deweyDecimal: formData.deweyDecimal ?? null,
+        }).catch(() => {});
       }
 
       if (selectedLibraryIds.length > 0 && newCopyId) {
