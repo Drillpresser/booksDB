@@ -235,12 +235,15 @@ export async function getPublicLibraries(search?: string): Promise<LibraryWithMe
   const cardMap: Record<string, string> = {};
   ((cardRes.data as any[]) ?? []).forEach((c: any) => { cardMap[c.library_id] = c.status; });
 
-  return libs.map((l: any): LibraryWithMeta => ({
-    ...toLibrary(l),
-    ownerDisplayName: profileMap[l.owner_id] ?? 'Reader',
-    bookCount: countMap[l.id] ?? 0,
-    myCardStatus: (cardMap[l.id] as any) ?? 'none',
-  }));
+  return libs
+    .map((l: any): LibraryWithMeta => ({
+      ...toLibrary(l),
+      ownerDisplayName: profileMap[l.owner_id] ?? 'Reader',
+      bookCount: countMap[l.id] ?? 0,
+      myCardStatus: (cardMap[l.id] as any) ?? 'none',
+    }))
+    // Empty shelves are hidden from public browse — there's nothing to see yet.
+    .filter((l) => l.bookCount > 0);
 }
 
 // ── Library Books ──────────────────────────────────────────────────────────
