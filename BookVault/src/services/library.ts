@@ -212,38 +212,35 @@ export async function getFollowedLibraries(): Promise<LibraryWithMeta[]> {
 export async function getPublicLibraries(search?: string): Promise<LibraryWithMeta[]> {
   const { data: { user } } = await supabase.auth.getUser();
 
-  let query = supabase.from('libraries').select('*').eq('is_public', true);
+  // The public_library_directory view already excludes empty shelves and
+  // precomputes owner display name and book count, so the limit applies to
+  // non-empty shelves only.
+  let query = supabase.from('public_library_directory').select('*');
   if (search?.trim()) query = query.ilike('name', `%${search.trim()}%`);
-  const { data: libs } = await query.order('created_at', { ascending: false }).limit(50);
-  if (!libs?.length) return [];
+  const { data: rows } = await query.order('created_at', { ascending: false }).limit(50);
+  if (!rows?.length) return [];
 
-  const ownerIds = [...new Set(libs.map((l: any) => l.owner_id))];
-  const libIds = libs.map((l: any) => l.id);
+  const libIds = (rows as any[]).map((r) => r.id);
 
-  const [profileRes, countRes, cardRes] = await Promise.all([
-    supabase.from('profiles').select('id, display_name').in('id', ownerIds),
-    supabase.from('library_books').select('library_id').in('library_id', libIds),
-    user ? supabase.from('library_cards').select('library_id, status').eq('user_id', user.id).in('library_id', libIds) : Promise.resolve({ data: [] }),
-  ]);
-
-  const profileMap: Record<string, string> = {};
-  ((profileRes.data as any[]) ?? []).forEach((p: any) => { profileMap[p.id] = p.display_name ?? 'Reader'; });
-
-  const countMap: Record<string, number> = {};
-  ((countRes.data as any[]) ?? []).forEach((r: any) => { countMap[r.library_id] = (countMap[r.library_id] ?? 0) + 1; });
+  // Card status is per-user, so it stays a client-side overlay on the results.
+  const cardRes = user
+    ? await supabase.from('library_cards').select('library_id, status').eq('user_id', user.id).in('library_id', libIds)
+    : { data: [] };
 
   const cardMap: Record<string, string> = {};
   ((cardRes.data as any[]) ?? []).forEach((c: any) => { cardMap[c.library_id] = c.status; });
 
-  return libs
-    .map((l: any): LibraryWithMeta => ({
-      ...toLibrary(l),
-      ownerDisplayName: profileMap[l.owner_id] ?? 'Reader',
-      bookCount: countMap[l.id] ?? 0,
-      myCardStatus: (cardMap[l.id] as any) ?? 'none',
-    }))
-    // Empty shelves are hidden from public browse — there's nothing to see yet.
-    .filter((l) => l.bookCount > 0);
+  return (rows as any[]).map((r): LibraryWithMeta => ({
+    id: r.id,
+    ownerId: r.owner_id,
+    name: r.name,
+    description: r.description,
+    isPublic: r.is_public,
+    createdAt: r.created_at,
+    ownerDisplayName: r.owner_display_name ?? 'Reader',
+    bookCount: Number(r.book_count) || 0,
+    myCardStatus: (cardMap[r.id] as any) ?? 'none',
+  }));
 }
 
 // ── Library Books ──────────────────────────────────────────────────────────
