@@ -1,6 +1,3 @@
--- Run this in your Supabase SQL editor:
--- https://supabase.com/dashboard/project/_/sql/new
---
 -- Public shelf directory: public libraries that hold at least one book, with
 -- their owner's display name and book count precomputed. Empty shelves are
 -- excluded here (at the database level) so they never appear in public browse

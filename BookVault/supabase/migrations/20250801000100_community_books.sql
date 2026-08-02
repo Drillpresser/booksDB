@@ -1,6 +1,3 @@
--- Run this in your Supabase SQL editor:
--- https://supabase.com/dashboard/project/_/sql/new
---
 -- Community catalog: a shared, ISBN-keyed record of book metadata that any
 -- authenticated user can contribute to. When a user edits a book's details
 -- (or adds one), the metadata is upserted here; when another user adds the same
@@ -25,17 +22,20 @@ create table if not exists community_books (
 alter table community_books enable row level security;
 
 -- Anyone signed in can read the shared catalog.
+drop policy if exists "Community books are readable by authenticated users" on community_books;
 create policy "Community books are readable by authenticated users"
   on community_books for select to authenticated
   using (true);
 
 -- Contributions must be attributed to the signed-in user.
+drop policy if exists "Authenticated users can contribute community books" on community_books;
 create policy "Authenticated users can contribute community books"
   on community_books for insert to authenticated
   with check (updated_by = auth.uid());
 
 -- Last-write-wins: any signed-in user may overwrite, but the row must be
 -- re-attributed to them.
+drop policy if exists "Authenticated users can update community books" on community_books;
 create policy "Authenticated users can update community books"
   on community_books for update to authenticated
   using (true)

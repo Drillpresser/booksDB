@@ -1,8 +1,8 @@
--- Run in Supabase SQL editor to fix invite deep links and anonymous browsing.
--- These policies allow unauthenticated users to read public libraries and
--- unclaimed invite cards, so the invite screen can show library details
+-- Allow unauthenticated users to read public libraries and unclaimed invite
+-- cards, so invite deep links and anonymous browsing can show library details
 -- before the user signs in.
 
+drop policy if exists "Anyone can view public libraries" on libraries;
 create policy "Anyone can view public libraries"
   on libraries for select to anon
   using (
@@ -15,6 +15,7 @@ create policy "Anyone can view public libraries"
     )
   );
 
+drop policy if exists "Anyone can view unclaimed invite cards" on library_cards;
 create policy "Anyone can view unclaimed invite cards"
   on library_cards for select to anon
   using (status = 'invite' and user_id is null);
