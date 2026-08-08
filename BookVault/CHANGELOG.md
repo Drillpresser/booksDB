@@ -5,11 +5,23 @@ Notable changes to BookHoarder. Versions correspond to iOS build numbers on Test
 ## [Unreleased]
 
 ### Added
-- **Classify books from the detail screen** — books without a classification now show a "Classify this book" row; classified books show a pencil icon on the classification card. Both open the same 3-step picker (Class → Section → Division). An "Ask Claude to suggest classification" button also appears, proposing the division plus Level 4 suffix and tags in one shot. Changes sync to Supabase shelves immediately.
+- **Edit every book detail in one place** — the book detail screen's pencil opens an "Edit Details" sheet that edits cover image, title, author(s), publisher, year, pages, synopsis, classification (3-step Class → Section → Division picker), and Level 4 format/tags. Classification, format, and tag editing (previously inline on the detail screen) now live here too; the detail body shows them read-only and taps through to the editor. Edits are drafted and saved together, then synced to Supabase shelves. An "Ask Claude to suggest classification" button appears in the sheet, proposing the division plus Level 4 suffix and tags in one shot.
+- **Set a custom cover image** — a book's cover can be chosen from the photo library or removed from the Edit Details sheet. Picked images are copied into the app's covers directory (adds the `expo-image-picker` native module, so this feature needs a new build).
+- **Shared community catalog** — when you add or edit a book, its metadata is contributed to a shared, ISBN-keyed catalog. When another user adds the same ISBN, the lookup returns the community-curated version, with the external APIs (OpenLibrary / Google Books) filling any gaps. MVP scope: text metadata only (custom covers stay on-device), last-write-wins, and it seeds new adds rather than back-filling copies already added.
+
+### Changed
+- **Search results survive opening a result** — in Add Book, selecting a search result and then going back now returns to the results list ("Back to results") instead of resetting the search.
+- **"Ask Claude" buttons only show with an API key** — the classification-suggestion and fill-missing-fields buttons on the Add and detail screens are hidden unless an Anthropic API key is saved, instead of always showing and alerting on tap.
+- **Empty shelves are hidden from public browse** — public shelves with no books no longer appear in Browse until they contain at least one book.
 
 ### Fixed
 - **Orphaned shelf entries are now removable** — if a copy was deleted with "Keep on Shelves", navigating to its detail showed a dead-end "Book not found." screen. It now shows a "Remove from All Shelves" button to clean up the dangling shelf entry.
 - **Shelf pills only show shelves you own** — cardholders of a public shelf were seeing a pill on book detail and add screens that let them add books to that shelf (an action only the owner can perform). `getMyLibraries` now filters by `owner_id` so member-only shelves never appear in the UI.
+
+### Backend (Supabase)
+- **`community_books` table** — shared, ISBN-keyed metadata catalog with RLS (readable by any authenticated user; last-write-wins writes attributed via `updated_by`).
+- **`public_library_directory` view** — public shelves with at least one book, with owner display name and book count precomputed; powers Browse and excludes empty shelves at the database level.
+- **Migrations are now CLI-managed and auto-deployed** — the hand-run SQL files moved into `supabase/migrations/` (idempotent) and a GitHub Actions workflow runs `supabase db push` against the linked project on pushes to `main`.
 
 ## [Build 14] — 2026-07-12 (TestFlight)
 
