@@ -1,0 +1,8 @@
+# Supabase CLI project config. The remote project is selected in CI via
+# `supabase link --project-ref <ref>` (see .github/workflows/deploy-migrations.yml),
+# so this file only needs to mark the directory as a Supabase project and pin
+# the Postgres major version used by migrations.
+project_id = "bookvault"
+
+[db]
+major_version = 15

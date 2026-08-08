@@ -23,6 +23,26 @@ export async function saveCoverImage(bookRecordId: string, imageUrl: string): Pr
   }
 }
 
+// Copy a local image (e.g. one picked from the photo library) into the covers
+// directory. A timestamped filename avoids the Image component caching a stale
+// bitmap when the cover for a record is replaced.
+export async function saveLocalCoverImage(bookRecordId: string, sourceUri: string): Promise<string | null> {
+  try {
+    await ensureCoversDir();
+    const localUri = `${COVERS_DIR}${bookRecordId}-${Date.now()}.jpg`;
+    await FileSystem.copyAsync({ from: sourceUri, to: localUri });
+    return localUri;
+  } catch {
+    return null;
+  }
+}
+
+// Remove a cover file we own. No-op for remote URLs or covers stored elsewhere.
+export async function deleteCoverImage(uri: string | null): Promise<void> {
+  if (!uri || !uri.startsWith(COVERS_DIR)) return;
+  await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+}
+
 function rowToRecord(row: any): BookRecord {
   return {
     id: row.id,

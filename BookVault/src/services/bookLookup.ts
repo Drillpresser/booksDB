@@ -1,4 +1,5 @@
 import { getRecordByIsbn } from '../database/queries/books';
+import { getCommunityBook } from './communityCatalog';
 import type { BookLookupResult } from '../types';
 
 const GOOGLE_BOOKS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY ?? '';
@@ -109,11 +110,38 @@ export async function lookupByIsbn(isbn: string): Promise<BookLookupResult | nul
     };
   }
 
-  const [olResult, googleResult] = await Promise.all([
+  const [community, olResult, googleResult] = await Promise.all([
+    getCommunityBook(clean).catch(() => null),
     lookupOpenLibrary(clean),
     lookupGoogleBooks(clean),
   ]);
-  return mergeResults(olResult, googleResult);
+  return mergeCommunity(community, mergeResults(olResult, googleResult), clean);
+}
+
+// Overlays the community-curated record on top of the external-API result.
+// Community fields win when present (human curation beats raw API data);
+// external data fills any gaps. Ratings are always taken from the external
+// result since the community catalog does not track them.
+function mergeCommunity(
+  community: BookLookupResult | null,
+  external: BookLookupResult | null,
+  isbn: string,
+): BookLookupResult | null {
+  if (!community) return external;
+  if (!external) return community;
+  return {
+    title: community.title || external.title,
+    authors: community.authors.length ? community.authors : external.authors,
+    publisher: community.publisher ?? external.publisher,
+    publishedYear: community.publishedYear ?? external.publishedYear,
+    pageCount: community.pageCount ?? external.pageCount,
+    synopsis: community.synopsis ?? external.synopsis,
+    coverUrl: community.coverUrl ?? external.coverUrl,
+    deweyDecimal: community.deweyDecimal ?? external.deweyDecimal,
+    communityRating: external.communityRating,
+    communityRatingCount: external.communityRatingCount,
+    isbn13: isbn,
+  };
 }
 
 async function lookupOpenLibrary(isbn: string): Promise<ResultWithLang | null> {

@@ -16,6 +16,7 @@ import { generateId, getDB } from '../../src/database/db';
 import { getAllMainClasses, getSectionsByMainClass, getDivisionsBySection } from '../../src/database/queries/classifications';
 import { RFFC_SUFFIXES, RFFC_TAGS } from '../../src/data/rffcClassifications';
 import { getMyLibraries, syncBookToLibraries } from '../../src/services/library';
+import { upsertCommunityBook } from '../../src/services/communityCatalog';
 import type { Library } from '../../src/services/library';
 import type { BookLookupResult, MainClass, Section, Division } from '../../src/types';
 
@@ -46,12 +47,15 @@ export default function AddBookScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<BookLookupResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [cameFromSearch, setCameFromSearch] = useState(false);
   const [myLibraries, setMyLibraries] = useState<Library[]>([]);
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   useEffect(() => {
     setMainClasses(getAllMainClasses());
     getMyLibraries().then(setMyLibraries).catch(() => {});
+    getApiKey().then((k) => setHasApiKey(!!k)).catch(() => setHasApiKey(false));
   }, []);
 
   async function handleSearch() {
@@ -71,6 +75,7 @@ export default function AddBookScreen() {
     setFormData({ ...result });
     const isbn = result.isbn13 ?? '';
     setIsbnInput(isbn);
+    setCameFromSearch(true);
     setMode('manual');
     if (isbn) handleIsbnLookup(isbn);
   }
@@ -237,6 +242,23 @@ export default function AddBookScreen() {
         throw e;
       }
 
+      // Contribute this book's metadata to the shared catalog so other users
+      // adding the same ISBN receive it. Fire-and-forget; ISBN-less books can't
+      // participate (the catalog is keyed by ISBN).
+      if (isbn) {
+        upsertCommunityBook({
+          isbn13: isbn,
+          title: formData.title!,
+          authors: formData.authors ?? [],
+          publisher: formData.publisher ?? null,
+          publishedYear: formData.publishedYear ?? null,
+          pageCount: formData.pageCount ?? null,
+          synopsis: formData.synopsis ?? null,
+          coverUrl: formData.coverUrl ? formData.coverUrl.replace(/^http:\/\//i, 'https://') : null,
+          deweyDecimal: formData.deweyDecimal ?? null,
+        }).catch(() => {});
+      }
+
       if (selectedLibraryIds.length > 0 && newCopyId) {
         const authors = formData.authors ?? [];
         syncBookToLibraries(selectedLibraryIds, {
@@ -298,6 +320,7 @@ export default function AddBookScreen() {
             if (scanned.current) return;
             scanned.current = true;
             setIsbnInput(data);
+            setCameFromSearch(false);
             setMode('manual');
             handleIsbnLookup(data);
           }}
@@ -392,7 +415,7 @@ export default function AddBookScreen() {
             <Ionicons name="search-outline" size={22} color="#fff" style={{ marginRight: spacing.sm }} />
             <Text style={styles.btnText}>Search by Title / Author</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.btn, { backgroundColor: colors.textSecondary }]} onPress={() => setMode('manual')}>
+          <TouchableOpacity style={[styles.btn, { backgroundColor: colors.textSecondary }]} onPress={() => { setCameFromSearch(false); setMode('manual'); }}>
             <Ionicons name="pencil-outline" size={22} color="#fff" style={{ marginRight: spacing.sm }} />
             <Text style={styles.btnText}>Enter Manually</Text>
           </TouchableOpacity>
@@ -428,9 +451,9 @@ export default function AddBookScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.form}>
-        <TouchableOpacity style={styles.backRow} onPress={() => setMode('choose')}>
+        <TouchableOpacity style={styles.backRow} onPress={() => setMode(cameFromSearch ? 'search' : 'choose')}>
           <Ionicons name="chevron-back" size={18} color={colors.primary} />
-          <Text style={styles.backRowText}>Choose different method</Text>
+          <Text style={styles.backRowText}>{cameFromSearch ? 'Back to results' : 'Choose different method'}</Text>
         </TouchableOpacity>
         <TextInput
           style={styles.input}
@@ -545,14 +568,18 @@ export default function AddBookScreen() {
           </>
         )}
 
-        <TouchableOpacity style={styles.claudeBtn} onPress={handleAskClaude} disabled={loading}>
-          <Ionicons name="sparkles-outline" size={18} color={colors.primary} style={{ marginRight: spacing.xs }} />
-          <Text style={styles.claudeBtnText}>Ask Claude to fill missing fields</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.claudeBtn} onPress={handleSuggestClassification} disabled={loading}>
-          <Ionicons name="sparkles-outline" size={18} color={colors.primary} style={{ marginRight: spacing.xs }} />
-          <Text style={styles.claudeBtnText}>Ask Claude to suggest classification</Text>
-        </TouchableOpacity>
+        {hasApiKey && (
+          <TouchableOpacity style={styles.claudeBtn} onPress={handleAskClaude} disabled={loading}>
+            <Ionicons name="sparkles-outline" size={18} color={colors.primary} style={{ marginRight: spacing.xs }} />
+            <Text style={styles.claudeBtnText}>Ask Claude to fill missing fields</Text>
+          </TouchableOpacity>
+        )}
+        {hasApiKey && (
+          <TouchableOpacity style={styles.claudeBtn} onPress={handleSuggestClassification} disabled={loading}>
+            <Ionicons name="sparkles-outline" size={18} color={colors.primary} style={{ marginRight: spacing.xs }} />
+            <Text style={styles.claudeBtnText}>Ask Claude to suggest classification</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={[styles.btn, { marginTop: spacing.lg }]} onPress={handleSave} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Save Book</Text>}

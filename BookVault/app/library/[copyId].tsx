@@ -10,7 +10,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fonts, spacing, radius } from '../../src/theme';
 import { CommunityRatings } from '../../src/components/CommunityRatings';
-import { getCopyById, updateBookCopy, deleteBookCopy, getRecordCopySummary } from '../../src/database/queries/books';
+import * as ImagePicker from 'expo-image-picker';
+import {
+  getCopyById, updateBookCopy, updateBookRecord, deleteBookCopy, getRecordCopySummary,
+  saveLocalCoverImage, deleteCoverImage,
+} from '../../src/database/queries/books';
+import { deriveSortAuthor } from '../../src/services/bookLookup';
+import { upsertCommunityBook } from '../../src/services/communityCatalog';
 import { getAllMainClasses, getSectionsByMainClass, getDivisionsBySection } from '../../src/database/queries/classifications';
 import { suggestClassification, getApiKey } from '../../src/services/claude';
 import { getLoanHistoryForCopy, createLoan, returnLoan } from '../../src/database/queries/loans';
@@ -56,6 +62,22 @@ export default function BookDetailScreen() {
   const [classPickerMC, setClassPickerMC] = useState<MainClass | null>(null);
   const [classPickerSec, setClassPickerSec] = useState<Section | null>(null);
   const [classifying, setClassifying] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [editVisible, setEditVisible] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editAuthors, setEditAuthors] = useState('');
+  const [editPublisher, setEditPublisher] = useState('');
+  const [editYear, setEditYear] = useState('');
+  const [editPages, setEditPages] = useState('');
+  const [editSynopsis, setEditSynopsis] = useState('');
+  const [editCover, setEditCover] = useState<string | null>(null);
+  const [editDivision, setEditDivision] = useState<Division | null>(null);
+  const [editSection, setEditSection] = useState<Section | null>(null);
+  const [editMainClass, setEditMainClass] = useState<MainClass | null>(null);
+  const [editSuffix, setEditSuffix] = useState<string | null>(null);
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editCustomTag, setEditCustomTag] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -78,6 +100,7 @@ export default function BookDetailScreen() {
     }
     getMyLibraries().then(setMyLibraries).catch(() => {});
     getLibraryIdsForCopy(copyId).then(setMemberLibraryIds).catch(() => {});
+    getApiKey().then((k) => setHasApiKey(!!k)).catch(() => setHasApiKey(false));
   }
 
   async function handleRemoveFromShelves() {
@@ -92,38 +115,164 @@ export default function BookDetailScreen() {
     router.back();
   }
 
-  function applyClassification(div: Division, sec: Section, mc: MainClass) {
+  function handleOpenEdit() {
     if (!book) return;
-    updateBookCopy(book.id, { divisionId: div.id });
-    setBook((prev) => prev ? { ...prev, division: div, section: sec, mainClass: mc, divisionId: div.id } : prev);
+    setEditTitle(book.record.title);
+    setEditAuthors(book.record.authors.join(', '));
+    setEditPublisher(book.record.publisher ?? '');
+    setEditYear(book.record.publishedYear?.toString() ?? '');
+    setEditPages(book.record.pageCount?.toString() ?? '');
+    setEditSynopsis(book.record.synopsis ?? '');
+    setEditCover(book.record.coverImage);
+    setEditDivision(book.division);
+    setEditSection(book.section);
+    setEditMainClass(book.mainClass);
+    setEditSuffix(book.suffix);
+    setEditTags(book.tags);
+    setEditCustomTag('');
+    setLevel4Expanded(!!(book.suffix || book.tags.length > 0));
+    setEditVisible(true);
+  }
+
+  async function handlePickCover() {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission Needed', 'Allow photo library access to choose a cover image.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setEditCover(result.assets[0].uri);
+      }
+    } catch {
+      Alert.alert('Error', 'Could not open your photo library.');
+    }
+  }
+
+  function toggleEditSuffix(code: string) {
+    setEditSuffix((cur) => (cur === code ? null : code));
+  }
+
+  function toggleEditTag(tag: string) {
+    setEditTags((cur) => (cur.includes(tag) ? cur.filter((t) => t !== tag) : [...cur, tag]));
+  }
+
+  function addEditCustomTag() {
+    const tag = editCustomTag.trim().toLowerCase();
+    if (!tag) return;
+    setEditTags((cur) => (cur.includes(tag) ? cur : [...cur, tag]));
+    setEditCustomTag('');
+  }
+
+  async function handleSaveEdit() {
+    if (!book) return;
+    const title = editTitle.trim();
+    if (!title) {
+      Alert.alert('Title Required', 'Please enter a book title.');
+      return;
+    }
+    const authors = editAuthors.split(',').map((a) => a.trim()).filter(Boolean);
+    const sortAuthor = deriveSortAuthor(authors);
+    const publisher = editPublisher.trim() || null;
+    const publishedYear = editYear.trim() ? (parseInt(editYear, 10) || null) : null;
+    const pageCount = editPages.trim() ? (parseInt(editPages, 10) || null) : null;
+    const synopsis = editSynopsis.trim() || null;
+    const divisionId = editDivision?.id ?? null;
+
+    setSavingEdit(true);
+
+    const prevCover = book.record.coverImage;
+    let coverImage = prevCover;
+    if (editCover !== prevCover) {
+      if (!editCover) {
+        coverImage = null;
+      } else if (editCover.startsWith('file://') && editCover !== prevCover) {
+        // A freshly picked photo — persist it into our covers directory.
+        coverImage = (await saveLocalCoverImage(book.record.id, editCover)) ?? editCover;
+      } else {
+        coverImage = editCover;
+      }
+    }
+
+    try {
+      updateBookRecord(book.record.id, { title, authors, sortAuthor, publisher, publishedYear, pageCount, synopsis, coverImage });
+      updateBookCopy(book.id, { divisionId, suffix: editSuffix, tags: editTags });
+    } catch {
+      setSavingEdit(false);
+      Alert.alert('Error', 'Could not save changes. Please try again.');
+      return;
+    }
+
+    // Clean up the previous cover file if it was replaced with a different one.
+    if (prevCover && prevCover !== coverImage) {
+      deleteCoverImage(prevCover).catch(() => {});
+    }
+
+    const updatedRecord = { ...book.record, title, authors, sortAuthor, publisher, publishedYear, pageCount, synopsis, coverImage };
+    setBook((prev) => prev ? {
+      ...prev,
+      record: updatedRecord,
+      division: editDivision,
+      section: editSection,
+      mainClass: editMainClass,
+      divisionId,
+      suffix: editSuffix,
+      tags: editTags,
+    } : prev);
+
+    // Contribute the edited metadata to the shared catalog so other users
+    // adding this ISBN receive it. Only remote (http) covers can be shared;
+    // custom on-device covers stay local for now.
+    if (updatedRecord.isbn13) {
+      upsertCommunityBook({
+        isbn13: updatedRecord.isbn13,
+        title,
+        authors,
+        publisher,
+        publishedYear,
+        pageCount,
+        synopsis,
+        coverUrl: coverImage && /^https?:\/\//i.test(coverImage) ? coverImage : null,
+        deweyDecimal: updatedRecord.deweyDecimal,
+      }).catch(() => {});
+    }
+
     if (memberLibraryIds.length > 0) {
-      const isbn = book.record.isbn13;
-      const coverImage = isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg` : null;
+      const isbn = updatedRecord.isbn13;
+      const shelfCover = isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg` : null;
       memberLibraryIds.forEach((libId) => {
         upsertBookInLibrary(libId, {
           copyId: book.id,
-          recordId: book.record.id,
-          title: book.record.title,
-          authors: book.record.authors,
-          sortAuthor: book.record.sortAuthor,
+          recordId: updatedRecord.id,
+          title,
+          authors,
+          sortAuthor,
           isbn13: isbn,
-          publisher: book.record.publisher,
-          publishedYear: book.record.publishedYear,
-          pageCount: book.record.pageCount,
-          synopsis: book.record.synopsis,
-          coverImage,
-          deweyDecimal: book.record.deweyDecimal,
+          publisher,
+          publishedYear,
+          pageCount,
+          synopsis,
+          coverImage: shelfCover,
+          deweyDecimal: updatedRecord.deweyDecimal,
           copyNumber: book.copyNumber,
-          divisionCode: div.code,
-          divisionName: div.name,
-          sectionCode: sec.code,
-          sectionName: sec.name,
-          mainClassCode: mc.code,
-          mainClassName: mc.name,
+          divisionCode: editDivision?.code ?? null,
+          divisionName: editDivision?.name ?? null,
+          sectionCode: editSection?.code ?? null,
+          sectionName: editSection?.name ?? null,
+          mainClassCode: editMainClass?.code ?? null,
+          mainClassName: editMainClass?.name ?? null,
           isOnLoan: book.isOnLoan,
         }).catch(() => {});
       });
     }
+
+    setSavingEdit(false);
+    setEditVisible(false);
   }
 
   function handleOpenClassPicker() {
@@ -156,15 +305,15 @@ export default function BookDetailScreen() {
         const div = allDiv.find((d) => d.id === suggestion.divisionId) ?? null;
         const sec = div ? allSec.find((s) => s.id === div.sectionId) ?? null : null;
         const mc = sec ? allMC.find((m) => m.id === sec.mainClassId) ?? null : null;
-        if (div && sec && mc) applyClassification(div, sec, mc);
+        if (div && sec && mc) {
+          setEditDivision(div);
+          setEditSection(sec);
+          setEditMainClass(mc);
+        }
       }
-      if (suggestion.suffix !== null) {
-        updateBookCopy(book.id, { suffix: suggestion.suffix });
-        setBook((prev) => prev ? { ...prev, suffix: suggestion.suffix } : prev);
-      }
+      if (suggestion.suffix !== null) setEditSuffix(suggestion.suffix);
       if (suggestion.tags.length > 0) {
-        updateBookCopy(book.id, { tags: suggestion.tags });
-        setBook((prev) => prev ? { ...prev, tags: suggestion.tags } : prev);
+        setEditTags(suggestion.tags);
         setLevel4Expanded(true);
       }
     } catch {
@@ -172,20 +321,6 @@ export default function BookDetailScreen() {
     } finally {
       setClassifying(false);
     }
-  }
-
-  function handleSuffixToggle(code: string) {
-    if (!book) return;
-    const next = book.suffix === code ? null : code;
-    updateBookCopy(book.id, { suffix: next });
-    setBook((prev) => prev ? { ...prev, suffix: next } : prev);
-  }
-
-  function handleTagToggle(tag: string) {
-    if (!book) return;
-    const next = book.tags.includes(tag) ? book.tags.filter((t) => t !== tag) : [...book.tags, tag];
-    updateBookCopy(book.id, { tags: next });
-    setBook((prev) => prev ? { ...prev, tags: next } : prev);
   }
 
   function handleRating(star: number) {
@@ -388,10 +523,13 @@ export default function BookDetailScreen() {
             {book.record.pageCount && <Text style={styles.meta}>{book.record.pageCount} pages</Text>}
             {book.copyNumber > 1 && <Text style={styles.copyLabel}>Copy {book.copyNumber}</Text>}
           </View>
+          <TouchableOpacity onPress={handleOpenEdit} hitSlop={8} style={styles.editIcon}>
+            <Ionicons name="pencil-outline" size={20} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
         {book.division ? (
-          <View style={styles.classCard}>
+          <TouchableOpacity style={styles.classCard} onPress={handleOpenEdit} activeOpacity={0.7}>
             <Ionicons name="layers-outline" size={16} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={styles.classText} numberOfLines={2}>
@@ -403,65 +541,19 @@ export default function BookDetailScreen() {
                 </Text>
               )}
             </View>
-            <TouchableOpacity onPress={handleOpenClassPicker} hitSlop={8}>
-              <Ionicons name="pencil-outline" size={18} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
+            <Ionicons name="pencil-outline" size={18} color={colors.primary} />
+          </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.classifyBtn} onPress={handleOpenClassPicker}>
+          <TouchableOpacity style={styles.classifyBtn} onPress={handleOpenEdit} activeOpacity={0.7}>
             <Ionicons name="layers-outline" size={16} color={colors.textSecondary} />
-            <Text style={styles.classifyBtnText}>Classify this book</Text>
+            <Text style={styles.classifyBtnText}>
+              {book.suffix || book.tags.length > 0
+                ? [book.suffix, ...book.tags].filter(Boolean).join(' , ')
+                : 'Unclassified — tap to classify'}
+            </Text>
             <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
-
-        <TouchableOpacity style={styles.level4Toggle} onPress={() => setLevel4Expanded((v) => !v)}>
-          <Ionicons name={level4Expanded ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textSecondary} />
-          <Text style={styles.level4ToggleText}>Format & Tags</Text>
-          {!level4Expanded && (book.suffix || book.tags.length > 0) && (
-            <Text style={styles.level4Summary} numberOfLines={1}>
-              {[book.suffix, ...book.tags].filter(Boolean).join(' , ')}
-            </Text>
-          )}
-        </TouchableOpacity>
-        {level4Expanded && (
-          <View style={styles.level4Body}>
-            <Text style={styles.level4Hint}>Form / audience — at most one</Text>
-            <View style={styles.chipWrap}>
-              {RFFC_SUFFIXES.map((s) => {
-                const on = book.suffix === s.code;
-                return (
-                  <TouchableOpacity key={s.code} style={[styles.chip, on && styles.chipOn]} onPress={() => handleSuffixToggle(s.code)}>
-                    <Text style={[styles.chipText, on && styles.chipTextOn]}>{s.code} {s.short}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <Text style={styles.level4Hint}>Tags — secondary genres only</Text>
-            <View style={styles.chipWrap}>
-              {[...new Set([...RFFC_TAGS, ...book.tags])].map((t) => {
-                const on = book.tags.includes(t);
-                return (
-                  <TouchableOpacity key={t} style={[styles.chip, on && styles.chipOn]} onPress={() => handleTagToggle(t)}>
-                    <Text style={[styles.chipText, on && styles.chipTextOn]}>{t}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        )}
-
-        <TouchableOpacity style={styles.claudeBtn} onPress={handleSuggestClassification} disabled={classifying}>
-          {classifying
-            ? <ActivityIndicator color={colors.primary} size="small" />
-            : (
-              <>
-                <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
-                <Text style={styles.claudeBtnText}>Ask Claude to suggest classification</Text>
-              </>
-            )
-          }
-        </TouchableOpacity>
 
         {copySummary && copySummary.total > 1 && (
           <View style={[
@@ -628,6 +720,158 @@ export default function BookDetailScreen() {
         </View>
       </ScrollView>
 
+      <Modal visible={editVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Edit Details</Text>
+            <TouchableOpacity onPress={() => setEditVisible(false)}>
+              <Ionicons name="close" size={26} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} keyboardShouldPersistTaps="handled">
+            <View style={{ gap: spacing.xs }}>
+              <Text style={styles.fieldLabel}>Cover</Text>
+              <View style={styles.coverEditRow}>
+                {editCover ? (
+                  <Image source={{ uri: editCover }} style={styles.coverEditThumb} />
+                ) : (
+                  <View style={[styles.coverEditThumb, styles.coverEditPlaceholder]}>
+                    <Ionicons name="book-outline" size={26} color={colors.border} />
+                  </View>
+                )}
+                <View style={styles.coverEditActions}>
+                  <TouchableOpacity style={styles.coverEditBtn} onPress={handlePickCover}>
+                    <Ionicons name="image-outline" size={17} color={colors.primary} />
+                    <Text style={styles.coverEditBtnText}>{editCover ? 'Change Cover' : 'Choose Cover'}</Text>
+                  </TouchableOpacity>
+                  {editCover && (
+                    <TouchableOpacity style={styles.coverEditBtn} onPress={() => setEditCover(null)}>
+                      <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                      <Text style={[styles.coverEditBtnText, { color: colors.danger }]}>Remove</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </View>
+            <View style={{ gap: spacing.xs }}>
+              <Text style={styles.fieldLabel}>Title</Text>
+              <TextInput style={styles.modalInput} value={editTitle} onChangeText={setEditTitle} placeholder="Title" placeholderTextColor={colors.textSecondary} />
+            </View>
+            <View style={{ gap: spacing.xs }}>
+              <Text style={styles.fieldLabel}>Author(s)</Text>
+              <TextInput style={styles.modalInput} value={editAuthors} onChangeText={setEditAuthors} placeholder="Comma separated" placeholderTextColor={colors.textSecondary} autoCorrect={false} />
+            </View>
+            <View style={{ gap: spacing.xs }}>
+              <Text style={styles.fieldLabel}>Publisher</Text>
+              <TextInput style={styles.modalInput} value={editPublisher} onChangeText={setEditPublisher} placeholder="Publisher" placeholderTextColor={colors.textSecondary} />
+            </View>
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <View style={{ flex: 1, gap: spacing.xs }}>
+                <Text style={styles.fieldLabel}>Year</Text>
+                <TextInput style={styles.modalInput} value={editYear} onChangeText={setEditYear} placeholder="Year" keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
+              </View>
+              <View style={{ flex: 1, gap: spacing.xs }}>
+                <Text style={styles.fieldLabel}>Pages</Text>
+                <TextInput style={styles.modalInput} value={editPages} onChangeText={setEditPages} placeholder="Pages" keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
+              </View>
+            </View>
+            <View style={{ gap: spacing.xs }}>
+              <Text style={styles.fieldLabel}>Synopsis</Text>
+              <TextInput style={[styles.modalInput, { minHeight: 100, textAlignVertical: 'top' }]} value={editSynopsis} onChangeText={setEditSynopsis} placeholder="Synopsis" multiline placeholderTextColor={colors.textSecondary} />
+            </View>
+
+            <View style={{ gap: spacing.xs }}>
+              <Text style={styles.fieldLabel}>Classification</Text>
+              <View style={styles.editClassRow}>
+                <TouchableOpacity style={styles.editClassPicker} onPress={handleOpenClassPicker}>
+                  <Text style={[styles.editClassPickerText, !editDivision && { color: colors.textSecondary }]} numberOfLines={2}>
+                    {editDivision
+                      ? `${editMainClass?.code} › ${editSection?.code} › ${editDivision.code} — ${editDivision.name}`
+                      : 'Unclassified'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+                {editDivision && (
+                  <TouchableOpacity onPress={() => { setEditDivision(null); setEditSection(null); setEditMainClass(null); }} hitSlop={8}>
+                    <Ionicons name="close-circle" size={22} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            <TouchableOpacity style={styles.level4Toggle} onPress={() => setLevel4Expanded((v) => !v)}>
+              <Ionicons name={level4Expanded ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textSecondary} />
+              <Text style={styles.level4ToggleText}>Format & Tags</Text>
+              {!level4Expanded && (editSuffix || editTags.length > 0) && (
+                <Text style={styles.level4Summary} numberOfLines={1}>
+                  {[editSuffix, ...editTags].filter(Boolean).join(' , ')}
+                </Text>
+              )}
+            </TouchableOpacity>
+            {level4Expanded && (
+              <View style={styles.level4Body}>
+                <Text style={styles.level4Hint}>Form / audience — at most one</Text>
+                <View style={styles.chipWrap}>
+                  {RFFC_SUFFIXES.map((s) => {
+                    const on = editSuffix === s.code;
+                    return (
+                      <TouchableOpacity key={s.code} style={[styles.chip, on && styles.chipOn]} onPress={() => toggleEditSuffix(s.code)}>
+                        <Text style={[styles.chipText, on && styles.chipTextOn]}>{s.code} {s.short}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={styles.level4Hint}>Tags — secondary genres only</Text>
+                <View style={styles.chipWrap}>
+                  {[...new Set([...RFFC_TAGS, ...editTags])].map((t) => {
+                    const on = editTags.includes(t);
+                    return (
+                      <TouchableOpacity key={t} style={[styles.chip, on && styles.chipOn]} onPress={() => toggleEditTag(t)}>
+                        <Text style={[styles.chipText, on && styles.chipTextOn]}>{t}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <View style={styles.customTagRow}>
+                  <TextInput
+                    style={[styles.modalInput, { flex: 1 }]}
+                    placeholder="Add custom tag"
+                    value={editCustomTag}
+                    onChangeText={setEditCustomTag}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    onSubmitEditing={addEditCustomTag}
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <TouchableOpacity style={styles.customTagAdd} onPress={addEditCustomTag}>
+                    <Ionicons name="add" size={20} color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {hasApiKey && (
+              <TouchableOpacity style={styles.claudeBtn} onPress={handleSuggestClassification} disabled={classifying}>
+                {classifying
+                  ? <ActivityIndicator color={colors.primary} size="small" />
+                  : (
+                    <>
+                      <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
+                      <Text style={styles.claudeBtnText}>Ask Claude to suggest classification</Text>
+                    </>
+                  )
+                }
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity style={styles.lendBtn} onPress={handleSaveEdit} disabled={savingEdit}>
+              {savingEdit ? <ActivityIndicator color="#fff" /> : <Text style={styles.lendBtnText}>Save Changes</Text>}
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
       <Modal visible={classPickerVisible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={styles.modalHeader}>
@@ -695,7 +939,9 @@ export default function BookDetailScreen() {
                 <TouchableOpacity
                   style={styles.pickerRow}
                   onPress={() => {
-                    applyClassification(div, classPickerSec!, classPickerMC!);
+                    setEditDivision(div);
+                    setEditSection(classPickerSec);
+                    setEditMainClass(classPickerMC);
                     setClassPickerVisible(false);
                   }}
                 >
@@ -895,6 +1141,17 @@ const styles = StyleSheet.create({
   removeFromShelvesBtnText: { color: colors.danger, fontSize: 14, fontWeight: '600' },
   classifyBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
   classifyBtnText: { flex: 1, fontSize: 14, color: colors.textSecondary },
+  coverEditRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  coverEditThumb: { width: 64, height: 92, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt },
+  coverEditPlaceholder: { justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  coverEditActions: { flex: 1, gap: spacing.sm },
+  coverEditBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignSelf: 'flex-start' },
+  coverEditBtnText: { fontSize: 14, color: colors.primary, fontWeight: '500' },
+  editClassRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  editClassPicker: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
+  editClassPickerText: { flex: 1, fontSize: 15, color: colors.text },
+  customTagRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  customTagAdd: { width: 44, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   claudeBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.primaryLight },
   claudeBtnText: { flex: 1, fontSize: 13, color: colors.primary, fontWeight: '500' },
   pickerRow: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderColor: colors.border, gap: spacing.md },
@@ -906,6 +1163,7 @@ const styles = StyleSheet.create({
   coverInsetBorder: { position: 'absolute', top: 6, left: 6, right: 6, bottom: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', borderRadius: 3 },
   coverPlaceholderTitle: { fontFamily: fonts.serif, fontWeight: '600', fontSize: 12, lineHeight: 16, color: 'rgba(250,243,224,0.96)', textAlign: 'center' },
   heroInfo: { flex: 1, gap: spacing.xs },
+  editIcon: { padding: spacing.xs, alignSelf: 'flex-start' },
   title: { fontSize: 21, fontWeight: '700', color: colors.text, fontFamily: fonts.serif, lineHeight: 26 },
   authors: { fontSize: 14, color: colors.textSecondary },
   meta: { fontSize: 13, color: colors.textSecondary },

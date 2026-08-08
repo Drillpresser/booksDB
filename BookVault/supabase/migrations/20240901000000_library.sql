@@ -1,5 +1,6 @@
--- Run this in your Supabase SQL editor:
--- https://supabase.com/dashboard/project/_/sql/new
+-- Core library schema: libraries, library_books, library_cards, book_requests,
+-- with RLS. Idempotent so it can be applied to a database that was previously
+-- provisioned by hand (tables use IF NOT EXISTS; policies are dropped first).
 
 -- Libraries: users can own multiple
 create table if not exists libraries (
@@ -85,24 +86,29 @@ alter table book_requests enable row level security;
 
 -- ── libraries ──────────────────────────────────────────────────────────────
 
+drop policy if exists "Authenticated users can view public libraries or own" on libraries;
 create policy "Authenticated users can view public libraries or own"
   on libraries for select to authenticated
   using (is_public = true or owner_id = auth.uid());
 
+drop policy if exists "Users can create their own libraries" on libraries;
 create policy "Users can create their own libraries"
   on libraries for insert to authenticated
   with check (owner_id = auth.uid());
 
+drop policy if exists "Owners can update their libraries" on libraries;
 create policy "Owners can update their libraries"
   on libraries for update to authenticated
   using (owner_id = auth.uid());
 
+drop policy if exists "Owners can delete their libraries" on libraries;
 create policy "Owners can delete their libraries"
   on libraries for delete to authenticated
   using (owner_id = auth.uid());
 
 -- ── library_books ──────────────────────────────────────────────────────────
 
+drop policy if exists "Books visible for accessible libraries" on library_books;
 create policy "Books visible for accessible libraries"
   on library_books for select to authenticated
   using (
@@ -119,6 +125,7 @@ create policy "Books visible for accessible libraries"
     )
   );
 
+drop policy if exists "Owners can manage their library books" on library_books;
 create policy "Owners can manage their library books"
   on library_books for all to authenticated
   using (
@@ -130,6 +137,7 @@ create policy "Owners can manage their library books"
 
 -- ── library_cards ──────────────────────────────────────────────────────────
 
+drop policy if exists "Owners, card holders, and unclaimed invites are visible" on library_cards;
 create policy "Owners, card holders, and unclaimed invites are visible"
   on library_cards for select to authenticated
   using (
@@ -138,10 +146,12 @@ create policy "Owners, card holders, and unclaimed invites are visible"
     or (status = 'invite' and user_id is null)
   );
 
+drop policy if exists "Users can apply for cards" on library_cards;
 create policy "Users can apply for cards"
   on library_cards for insert to authenticated
   with check (user_id = auth.uid() and status = 'pending');
 
+drop policy if exists "Owners can create invite cards" on library_cards;
 create policy "Owners can create invite cards"
   on library_cards for insert to authenticated
   with check (
@@ -149,6 +159,7 @@ create policy "Owners can create invite cards"
     and exists (select 1 from libraries l where l.id = library_id and l.owner_id = auth.uid())
   );
 
+drop policy if exists "Owners and users can update cards" on library_cards;
 create policy "Owners and users can update cards"
   on library_cards for update to authenticated
   using (
@@ -157,6 +168,7 @@ create policy "Owners and users can update cards"
     or (status = 'invite' and user_id is null)
   );
 
+drop policy if exists "Owners and users can delete cards" on library_cards;
 create policy "Owners and users can delete cards"
   on library_cards for delete to authenticated
   using (
@@ -166,6 +178,7 @@ create policy "Owners and users can delete cards"
 
 -- ── book_requests ──────────────────────────────────────────────────────────
 
+drop policy if exists "Requester and owner can view requests" on book_requests;
 create policy "Requester and owner can view requests"
   on book_requests for select to authenticated
   using (
@@ -173,6 +186,7 @@ create policy "Requester and owner can view requests"
     or exists (select 1 from libraries l where l.id = library_id and l.owner_id = auth.uid())
   );
 
+drop policy if exists "Approved cardholders can request" on book_requests;
 create policy "Approved cardholders can request"
   on book_requests for insert to authenticated
   with check (
@@ -185,6 +199,7 @@ create policy "Approved cardholders can request"
     )
   );
 
+drop policy if exists "Owners and requesters can update" on book_requests;
 create policy "Owners and requesters can update"
   on book_requests for update to authenticated
   using (

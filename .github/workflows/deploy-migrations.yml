@@ -1,0 +1,41 @@
+name: Deploy Supabase migrations
+
+# Applies any new migrations under BookVault/supabase/migrations to the linked
+# Supabase project whenever they change on main. Idempotent migrations mean a
+# re-run is safe even if an object already exists.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN  Personal access token (https://supabase.com/dashboard/account/tokens)
+#   SUPABASE_DB_PASSWORD   The project's database password
+#   SUPABASE_PROJECT_REF   The project ref (the <ref> in https://<ref>.supabase.co)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'BookVault/supabase/migrations/**'
+      - '.github/workflows/deploy-migrations.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: BookVault
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Push migrations
+        run: supabase db push
