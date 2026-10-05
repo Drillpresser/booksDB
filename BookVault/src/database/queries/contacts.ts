@@ -1,4 +1,5 @@
 import { getDB, generateId } from '../db';
+import { daysUntilDue, isLoanOverdue } from '../../lib/dates';
 import type { Contact } from '../../types';
 
 function rowToContact(row: any): Contact {
@@ -77,17 +78,13 @@ export function getContactLoanStatus(contactId: string): ContactLoanStatus {
     'SELECT date_lent, expected_return FROM loans WHERE contact_id = ? AND date_returned IS NULL',
     [contactId]
   ) as any[];
-  const now = Date.now();
   let hasOverdue = false;
   let hasDueSoon = false;
   for (const r of rows) {
-    if (r.expected_return) {
-      const due = new Date(r.expected_return).getTime();
-      if (due < now) hasOverdue = true;
-      else if (due - now < 3 * 86400000) hasDueSoon = true;
-    } else {
-      const lentMs = new Date(r.date_lent).getTime();
-      if (now - lentMs > 90 * 86400000) hasOverdue = true;
+    if (isLoanOverdue({ dateLent: r.date_lent, expectedReturn: r.expected_return, dateReturned: null })) {
+      hasOverdue = true;
+    } else if (r.expected_return && daysUntilDue(r.expected_return) <= 3) {
+      hasDueSoon = true;
     }
   }
   return { activeCount: rows.length, hasOverdue, hasDueSoon };

@@ -1,23 +1,14 @@
 import { getDB, generateId } from '../db';
-import { parseTags } from './books';
+import { parseTags, resolveCoverUri } from './books';
+import { isLoanOverdue } from '../../lib/dates';
 import type { Loan, LoanWithDetails } from '../../types';
-
-function isOverdue(loan: { dateLent: string; expectedReturn: string | null; dateReturned: string | null }): boolean {
-  if (loan.dateReturned) return false;
-  const now = new Date();
-  if (loan.expectedReturn) {
-    return new Date(loan.expectedReturn) < now;
-  }
-  const ninetyDaysAfterLent = new Date(loan.dateLent);
-  ninetyDaysAfterLent.setDate(ninetyDaysAfterLent.getDate() + 90);
-  return ninetyDaysAfterLent < now;
-}
 
 const LOAN_DETAIL_QUERY = `
   SELECT
     l.id, l.copy_id, l.contact_id, l.date_lent, l.expected_return,
     l.date_returned, l.notes,
     c.id AS c_id, c.name AS c_name, c.phone AS c_phone, c.email AS c_email, c.notes AS c_notes,
+    c.color AS c_color, c.created_at AS c_created_at,
     br.id AS br_id, br.title, br.authors, br.sort_author, br.isbn13,
     br.publisher, br.published_year, br.page_count, br.synopsis, br.cover_image,
     br.dewey_decimal, br.community_rating, br.community_rating_count, br.community_rating_fetched,
@@ -40,7 +31,7 @@ function rowToDetail(row: any): LoanWithDetails {
   };
   return {
     ...loan,
-    contact: { id: row.c_id, name: row.c_name, phone: row.c_phone, email: row.c_email, notes: row.c_notes, color: row.c_color ?? null, createdAt: null },
+    contact: { id: row.c_id, name: row.c_name, phone: row.c_phone, email: row.c_email, notes: row.c_notes, color: row.c_color ?? null, createdAt: row.c_created_at ?? null },
     bookRecord: {
       id: row.br_id,
       title: row.title,
@@ -51,7 +42,7 @@ function rowToDetail(row: any): LoanWithDetails {
       publishedYear: row.published_year,
       pageCount: row.page_count,
       synopsis: row.synopsis,
-      coverImage: row.cover_image,
+      coverImage: resolveCoverUri(row.cover_image),
       deweyDecimal: row.dewey_decimal,
       communityRating: row.community_rating,
       communityRatingCount: row.community_rating_count,
@@ -68,7 +59,7 @@ function rowToDetail(row: any): LoanWithDetails {
       notes: row.bc_notes,
       dateAdded: row.date_added,
     },
-    isOverdue: isOverdue(loan),
+    isOverdue: isLoanOverdue(loan),
   };
 }
 
@@ -133,6 +124,6 @@ export function getOverdueCount(): number {
     `SELECT date_lent, expected_return FROM loans WHERE date_returned IS NULL`
   ) as any[];
   return rows.filter((r) =>
-    isOverdue({ dateLent: r.date_lent, expectedReturn: r.expected_return, dateReturned: null })
+    isLoanOverdue({ dateLent: r.date_lent, expectedReturn: r.expected_return, dateReturned: null })
   ).length;
 }

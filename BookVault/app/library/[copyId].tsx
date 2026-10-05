@@ -30,6 +30,7 @@ import {
 } from '../../src/services/library';
 import type { Library } from '../../src/services/library';
 import type { BookCopyWithDetails, LoanWithDetails, Contact, MainClass, Section, Division } from '../../src/types';
+import { formatDate, toDateKey } from '../../src/lib/dates';
 
 export default function BookDetailScreen() {
   const { copyId } = useLocalSearchParams<{ copyId: string }>();
@@ -373,7 +374,7 @@ export default function BookDetailScreen() {
       return;
     }
 
-    const returnIso = returnDate ? returnDate.toISOString().split('T')[0] : null;
+    const returnIso = returnDate ? toDateKey(returnDate) : null;
     createLoan(book.id, contactId, new Date().toISOString(), returnIso, loanNotes.trim() || null);
     if (holds.length > 0 && holds[0].contactId === contactId) {
       removeHold(holds[0].id);
@@ -1118,11 +1119,6 @@ export default function BookDetailScreen() {
       </Modal>
     </SafeAreaView>
   );
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 const SPINE_COLORS = ['#4C703E', '#C5612A', '#2D4A2B', '#7A5C3E', '#3B5998', '#6B4C8A'];

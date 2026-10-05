@@ -8,29 +8,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fonts, spacing, radius } from '../../src/theme';
 import { getAllCopies, searchCopies } from '../../src/database/queries/books';
-import type { CopySortMode } from '../../src/database/queries/books';
-import { getPreference, setPreference } from '../../src/database/queries/preferences';
+import { LIBRARY_SORT_OPTIONS as SORT_OPTIONS, getLibrarySort, setLibrarySort } from '../../src/database/queries/preferences';
+import type { LibrarySortMode as SortMode } from '../../src/database/queries/preferences';
 import type { BookCopyWithDetails } from '../../src/types';
-
-type SortMode = 'author' | 'title' | 'mainClass' | 'section' | 'classification';
-
-const SORT_OPTIONS: { mode: SortMode; label: string }[] = [
-  { mode: 'author', label: 'Author' },
-  { mode: 'title', label: 'Title' },
-  { mode: 'mainClass', label: 'Class' },
-  { mode: 'section', label: 'Section' },
-  { mode: 'classification', label: 'Division' },
-];
 
 export default function LibraryScreen() {
   const router = useRouter();
-  const [sortMode, setSortMode] = useState<SortMode>(() => getPreference('library_sort', 'author') as SortMode);
+  const [sortMode, setSortMode] = useState<SortMode>(getLibrarySort);
   const [searchQuery, setSearchQuery] = useState('');
   const [books, setBooks] = useState<BookCopyWithDetails[]>([]);
 
+  // The tab stays mounted, so pick up a sort changed in Settings on refocus
   useFocusEffect(
     useCallback(() => {
-      setBooks(getAllCopies(sortMode as CopySortMode));
+      setSortMode(getLibrarySort());
+    }, [])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      setBooks(getAllCopies(sortMode));
     }, [sortMode])
   );
 
@@ -89,7 +86,7 @@ export default function LibraryScreen() {
             <TouchableOpacity
               key={mode}
               style={[styles.sortChip, sortMode === mode && styles.sortChipActive]}
-              onPress={() => { setPreference('library_sort', mode); setSortMode(mode); }}
+              onPress={() => { setLibrarySort(mode); setSortMode(mode); }}
             >
               <Text style={[styles.sortChipText, sortMode === mode && styles.sortChipTextActive]}>
                 {label}

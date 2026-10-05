@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { normalizeIsbn } from '../lib/isbn';
 
 let _db: SQLite.SQLiteDatabase | null = null;
 
@@ -12,7 +13,7 @@ export function getDB(): SQLite.SQLiteDatabase {
   return _db;
 }
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 function migrate(db: SQLite.SQLiteDatabase) {
   const versionRow = db.getFirstSync('PRAGMA user_version') as any;
@@ -141,6 +142,19 @@ function migrate(db: SQLite.SQLiteDatabase) {
       ALTER TABLE book_copies ADD COLUMN tags TEXT NOT NULL DEFAULT '[]';
     `);
     db.runSync(`PRAGMA user_version = 5`);
+  }
+
+  // Earlier builds saved ISBNs exactly as typed or scanned (hyphens, ISBN-10);
+  // rewrite them as canonical ISBN-13 so lookups, copies and ratings match.
+  if (currentVersion < 6) {
+    const rows = db.getAllSync('SELECT id, isbn13 FROM book_records WHERE isbn13 IS NOT NULL') as any[];
+    for (const r of rows) {
+      const normalized = normalizeIsbn(r.isbn13) || null;
+      if (normalized !== r.isbn13) {
+        db.runSync('UPDATE book_records SET isbn13 = ? WHERE id = ?', [normalized, r.id]);
+      }
+    }
+    db.runSync(`PRAGMA user_version = 6`);
   }
 
   });

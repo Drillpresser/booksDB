@@ -1,8 +1,18 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { getDB, generateId } from '../db';
+import { isLoanOverdue } from '../../lib/dates';
 import type { BookRecord, BookCopy, BookCopyWithDetails, LoanWithContact } from '../../types';
 
 const COVERS_DIR = FileSystem.documentDirectory + 'covers/';
+
+// iOS can move the app's data container on update or restore, so an absolute
+// file:// path saved by an earlier session may no longer exist. Covers we own
+// are rebuilt against the current documentDirectory on every read.
+export function resolveCoverUri(stored: string | null): string | null {
+  if (!stored?.startsWith('file://')) return stored;
+  const i = stored.lastIndexOf('/covers/');
+  return i === -1 ? stored : COVERS_DIR + stored.slice(i + '/covers/'.length);
+}
 
 async function ensureCoversDir() {
   const info = await FileSystem.getInfoAsync(COVERS_DIR);
@@ -54,7 +64,7 @@ function rowToRecord(row: any): BookRecord {
     publishedYear: row.published_year,
     pageCount: row.page_count,
     synopsis: row.synopsis,
-    coverImage: row.cover_image,
+    coverImage: resolveCoverUri(row.cover_image),
     deweyDecimal: row.dewey_decimal,
     communityRating: row.community_rating,
     communityRatingCount: row.community_rating_count,
@@ -176,13 +186,14 @@ export function getRecordByIsbn(isbn13: string): BookRecord | null {
   return row ? rowToRecord(row) : null;
 }
 
-export function getCopyCountForRecord(recordId: string): number {
+// MAX rather than COUNT so deleting an earlier copy can't produce a duplicate number.
+export function getNextCopyNumber(recordId: string): number {
   const db = getDB();
   const row = db.getFirstSync(
-    'SELECT COUNT(*) as count FROM book_copies WHERE record_id = ?',
+    'SELECT MAX(copy_number) as max FROM book_copies WHERE record_id = ?',
     [recordId]
   ) as any;
-  return row?.count ?? 0;
+  return (row?.max ?? 0) + 1;
 }
 
 export function insertBookRecord(data: Omit<BookRecord, 'id'>, presetId?: string): string {
@@ -313,17 +324,14 @@ export function searchCopies(query: string): BookCopyWithDetails[] {
 function getCurrentLoanForCopy(copyId: string): LoanWithContact | null {
   const db = getDB();
   const row = db.getFirstSync(
-    `SELECT l.*, c.id AS c_id, c.name AS c_name, c.phone AS c_phone, c.email AS c_email, c.notes AS c_notes
+    `SELECT l.*, c.id AS c_id, c.name AS c_name, c.phone AS c_phone, c.email AS c_email, c.notes AS c_notes,
+            c.color AS c_color, c.created_at AS c_created_at
      FROM loans l JOIN contacts c ON l.contact_id = c.id
      WHERE l.copy_id = ? AND l.date_returned IS NULL
      LIMIT 1`,
     [copyId]
   ) as any;
   if (!row) return null;
-  const now = new Date();
-  const isOverdue = row.expected_return
-    ? new Date(row.expected_return) < now
-    : new Date(new Date(row.date_lent).getTime() + 90 * 86400000) < now;
   return {
     id: row.id,
     copyId: row.copy_id,
@@ -332,7 +340,7 @@ function getCurrentLoanForCopy(copyId: string): LoanWithContact | null {
     expectedReturn: row.expected_return,
     dateReturned: row.date_returned,
     notes: row.notes,
-    contact: { id: row.c_id, name: row.c_name, phone: row.c_phone, email: row.c_email, notes: row.c_notes, color: row.c_color ?? null, createdAt: null },
-    isOverdue,
+    contact: { id: row.c_id, name: row.c_name, phone: row.c_phone, email: row.c_email, notes: row.c_notes, color: row.c_color ?? null, createdAt: row.c_created_at ?? null },
+    isOverdue: isLoanOverdue({ dateLent: row.date_lent, expectedReturn: row.expected_return, dateReturned: null }),
   };
 }

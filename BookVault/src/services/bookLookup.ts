@@ -1,5 +1,6 @@
 import { getRecordByIsbn } from '../database/queries/books';
 import { getCommunityBook } from './communityCatalog';
+import { normalizeIsbn } from '../lib/isbn';
 import type { BookLookupResult } from '../types';
 
 const GOOGLE_BOOKS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY ?? '';
@@ -13,18 +14,6 @@ async function fetchWithTimeout(url: string, ms = 6000): Promise<Response> {
   } finally {
     clearTimeout(timer);
   }
-}
-
-// Converts ISBN-10 to ISBN-13 by prepending 978 and recomputing the check digit.
-// Passthrough for ISBN-13 and anything else (unrecognised length).
-function normalizeIsbn(raw: string): string {
-  const clean = raw.replace(/[^0-9X]/gi, '').toUpperCase();
-  if (clean.length === 13) return clean;
-  if (clean.length !== 10) return clean;
-  const base = '978' + clean.slice(0, 9);
-  let sum = 0;
-  for (let i = 0; i < 12; i++) sum += parseInt(base[i], 10) * (i % 2 === 0 ? 1 : 3);
-  return base + ((10 - (sum % 10)) % 10);
 }
 
 type LangCode = 'en' | 'non-en' | null;

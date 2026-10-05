@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { isValidIsbn13 } from '../lib/isbn';
 import type { BookLookupResult } from '../types';
 
 // A shared, ISBN-keyed catalog of book metadata. When a user edits or adds a
@@ -43,7 +44,8 @@ export async function getCommunityBook(isbn13: string): Promise<BookLookupResult
 }
 
 export async function upsertCommunityBook(book: CommunityBookInput): Promise<void> {
-  if (!book.isbn13 || !book.title.trim()) return;
+  // Only canonical ISBN-13s — a hyphenated or ISBN-10 key would never match a lookup
+  if (!isValidIsbn13(book.isbn13) || !book.title.trim()) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
   await supabase.from('community_books').upsert(

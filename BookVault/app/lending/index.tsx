@@ -9,33 +9,30 @@ import { colors, fonts, spacing, radius } from '../../src/theme';
 import { getActiveLoans, getAllReturnedLoans, returnLoan } from '../../src/database/queries/loans';
 import { updateBookLoanStatus } from '../../src/services/library';
 import type { LoanWithDetails } from '../../src/types';
+import { daysLate, daysSince, daysUntilDue, formatDate } from '../../src/lib/dates';
 
 type Tab = 'active' | 'history';
 
 function duePill(loan: LoanWithDetails): { label: string; bg: string; color: string } {
   if (loan.isOverdue) {
-    const days = Math.floor((Date.now() - new Date(loan.expectedReturn ?? loan.dateLent).getTime()) / 86400000);
+    const days = loan.expectedReturn ? -daysUntilDue(loan.expectedReturn) : daysSince(loan.dateLent);
     return { label: `Overdue ${days}d`, bg: '#F6E0E0', color: colors.danger };
   }
   if (loan.expectedReturn) {
-    const daysLeft = Math.ceil((new Date(loan.expectedReturn).getTime() - Date.now()) / 86400000);
-    if (daysLeft <= 3) return { label: `Due in ${daysLeft}d`, bg: '#FCEAD2', color: colors.primaryDark };
-    const d = new Date(loan.expectedReturn);
-    const label = `Due ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+    const daysLeft = daysUntilDue(loan.expectedReturn);
+    if (daysLeft <= 3) {
+      return { label: daysLeft === 0 ? 'Due today' : `Due in ${daysLeft}d`, bg: '#FCEAD2', color: colors.primaryDark };
+    }
+    const label = `Due ${formatDate(loan.expectedReturn, { month: 'short', day: 'numeric' })}`;
     return { label, bg: '#EAF0DA', color: colors.accentDark };
   }
-  const days = Math.floor((Date.now() - new Date(loan.dateLent).getTime()) / 86400000);
-  return { label: `${days}d out`, bg: '#EAF0DA', color: colors.accentDark };
+  return { label: `${daysSince(loan.dateLent)}d out`, bg: '#EAF0DA', color: colors.accentDark };
 }
 
 function returnedPill(loan: LoanWithDetails): { label: string; bg: string; color: string } {
-  // was it returned late?
   if (loan.expectedReturn && loan.dateReturned) {
-    const late = new Date(loan.dateReturned) > new Date(loan.expectedReturn);
-    const daysLate = late
-      ? Math.ceil((new Date(loan.dateReturned).getTime() - new Date(loan.expectedReturn).getTime()) / 86400000)
-      : 0;
-    if (late) return { label: `${daysLate}d late`, bg: '#FCEAD2', color: colors.primaryDark };
+    const late = daysLate(loan.expectedReturn, loan.dateReturned);
+    if (late > 0) return { label: `${late}d late`, bg: '#FCEAD2', color: colors.primaryDark };
   }
   return { label: 'On time', bg: '#EAF0DA', color: colors.accentDark };
 }
@@ -81,7 +78,7 @@ export default function LendingScreen() {
   }
 
   const overdueCount = loans.filter((l) => l.isOverdue).length;
-  const lateCount = history.filter((l) => l.expectedReturn && l.dateReturned && new Date(l.dateReturned) > new Date(l.expectedReturn)).length;
+  const lateCount = history.filter((l) => l.expectedReturn && l.dateReturned && daysLate(l.expectedReturn, l.dateReturned) > 0).length;
 
   // Group history by month
   const historyGroups = useMemo(() => {

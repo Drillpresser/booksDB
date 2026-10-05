@@ -1,21 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, TextInput,
   Alert, ScrollView, Share,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fonts, spacing, radius } from '../../src/theme';
 import { getApiKey, saveApiKey, deleteApiKey } from '../../src/services/claude';
-import { getPreference, setPreference } from '../../src/database/queries/preferences';
+import { LIBRARY_SORT_OPTIONS, getLibrarySort, setLibrarySort } from '../../src/database/queries/preferences';
+import type { LibrarySortMode } from '../../src/database/queries/preferences';
 import { getAllCopies } from '../../src/database/queries/books';
 import { getDB } from '../../src/database/db';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { AuthSheet } from '../../src/components/AuthSheet';
 import { DisplayNameDialog } from '../../src/components/DisplayNameDialog';
-
-type SortMode = 'author' | 'title';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -27,7 +26,7 @@ export default function SettingsScreen() {
   const [hasKey, setHasKey] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [sortMode, setSortMode] = useState<SortMode>(() => getPreference('library_sort', 'author') as SortMode);
+  const [sortMode, setSortMode] = useState<LibrarySortMode>(getLibrarySort);
   const [volumeCount, setVolumeCount] = useState(0);
 
   useEffect(() => {
@@ -65,9 +64,18 @@ export default function SettingsScreen() {
     ]);
   }
 
-  function toggleSort() {
-    const next: SortMode = sortMode === 'author' ? 'title' : 'author';
-    setPreference('library_sort', next);
+  // The tab stays mounted, so pick up a sort changed on the Library tab on refocus
+  useFocusEffect(
+    useCallback(() => {
+      setSortMode(getLibrarySort());
+    }, [])
+  );
+
+  // Cycles through the same sort modes the Library tab offers
+  function cycleSort() {
+    const i = LIBRARY_SORT_OPTIONS.findIndex((o) => o.mode === sortMode);
+    const next = LIBRARY_SORT_OPTIONS[(i + 1) % LIBRARY_SORT_OPTIONS.length].mode;
+    setLibrarySort(next);
     setSortMode(next);
   }
 
@@ -93,7 +101,7 @@ export default function SettingsScreen() {
         })),
       };
       const json = JSON.stringify(payload, null, 2);
-      await Share.share({ message: json, title: 'BookVault Library Export' });
+      await Share.share({ message: json, title: 'BookHoarder Library Export' });
     } catch {
       Alert.alert('Export Failed', 'Could not export your library.');
     }
@@ -180,10 +188,10 @@ export default function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Library</Text>
-          <TouchableOpacity style={styles.navRow} onPress={toggleSort}>
+          <TouchableOpacity style={styles.navRow} onPress={cycleSort}>
             <Ionicons name="swap-vertical-outline" size={22} color={colors.primary} />
             <Text style={styles.navRowText}>Default sort</Text>
-            <Text style={styles.navRowValue}>{sortMode === 'author' ? 'Author' : 'Title'}</Text>
+            <Text style={styles.navRowValue}>{LIBRARY_SORT_OPTIONS.find((o) => o.mode === sortMode)?.label}</Text>
             <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>

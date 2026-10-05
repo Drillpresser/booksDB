@@ -14,6 +14,7 @@ import { getAllCopies } from '../../src/database/queries/books';
 import { getMyLibraries, createInvite, updateBookLoanStatus } from '../../src/services/library';
 import type { Library } from '../../src/services/library';
 import type { Contact, LoanWithDetails, BookCopyWithDetails } from '../../src/types';
+import { daysLate, daysSince, daysUntilDue, formatDate, toDateKey } from '../../src/lib/dates';
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -35,16 +36,11 @@ function getInitials(name: string): string {
 function duePill(loan: LoanWithDetails): { label: string; bg: string; color: string } {
   if (loan.isOverdue) return { label: 'Overdue', bg: '#F6E0E0', color: colors.danger };
   if (loan.expectedReturn) {
-    const d = Math.ceil((new Date(loan.expectedReturn).getTime() - Date.now()) / 86400000);
-    if (d <= 3) return { label: `Due in ${d}d`, bg: '#FCEAD2', color: colors.primaryDark };
-    return { label: `Due ${new Date(loan.expectedReturn).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`, bg: '#EAF0DA', color: colors.accentDark };
+    const d = daysUntilDue(loan.expectedReturn);
+    if (d <= 3) return { label: d === 0 ? 'Due today' : `Due in ${d}d`, bg: '#FCEAD2', color: colors.primaryDark };
+    return { label: `Due ${formatDate(loan.expectedReturn, { month: 'short', day: 'numeric' })}`, bg: '#EAF0DA', color: colors.accentDark };
   }
-  const d = Math.floor((Date.now() - new Date(loan.dateLent).getTime()) / 86400000);
-  return { label: `${d}d out`, bg: '#EAF0DA', color: colors.accentDark };
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return { label: `${daysSince(loan.dateLent)}d out`, bg: '#EAF0DA', color: colors.accentDark };
 }
 
 // ── Screen ───────────────────────────────────────────────────────────────────
@@ -141,7 +137,7 @@ export default function ContactDetailScreen() {
     }
     setLending(true);
     try {
-      const returnIso = returnDate ? returnDate.toISOString().split('T')[0] : null;
+      const returnIso = returnDate ? toDateKey(returnDate) : null;
       createLoan(selectedBook.id, contact.id, new Date().toISOString(), returnIso, lendNotes.trim() || null);
       await updateBookLoanStatus(selectedBook.id, true).catch(() => {});
       setLendVisible(false);
@@ -180,7 +176,7 @@ export default function ContactDetailScreen() {
       if (!inv?.inviteToken) throw new Error();
       const link = `bookvault://library/invite/${inv.inviteToken}`;
       await Share.share({
-        message: `${contact?.name ?? 'You'} — you're invited to ${lib.name} on BookVault!\n\n${link}`,
+        message: `${contact?.name ?? 'You'} — you're invited to ${lib.name} on BookHoarder!\n\n${link}`,
         title: `Invite to ${lib.name}`,
       });
     } catch {
@@ -218,7 +214,7 @@ export default function ContactDetailScreen() {
   const activeLoans = loans.filter((l) => !l.dateReturned);
   const pastLoans = loans.filter((l) => l.dateReturned);
   const onTimeCount = pastLoans.filter(
-    (l) => !l.expectedReturn || !l.dateReturned || new Date(l.dateReturned) <= new Date(l.expectedReturn)
+    (l) => !l.expectedReturn || !l.dateReturned || daysLate(l.expectedReturn, l.dateReturned) === 0
   ).length;
   const onTimePct = pastLoans.length > 0 ? Math.round((onTimeCount / pastLoans.length) * 100) : 100;
   const avatarColor = getAvatarColor(contact.id, contact.color);
@@ -391,7 +387,7 @@ export default function ContactDetailScreen() {
               const onTime =
                 !loan.expectedReturn ||
                 !loan.dateReturned ||
-                new Date(loan.dateReturned) <= new Date(loan.expectedReturn);
+                daysLate(loan.expectedReturn, loan.dateReturned) === 0;
               return (
                 <TouchableOpacity
                   key={loan.id}

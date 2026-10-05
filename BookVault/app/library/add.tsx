@@ -8,10 +8,10 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
-import * as FileSystem from 'expo-file-system';
 import { lookupByIsbn, searchBooks, deriveSortAuthor } from '../../src/services/bookLookup';
+import { normalizeIsbn, isValidIsbn13 } from '../../src/lib/isbn';
 import { lookupBookWithClaude, fillMissingFields, suggestClassification, getApiKey } from '../../src/services/claude';
-import { insertBookRecord, insertBookCopy, saveCoverImage, getRecordByIsbn, getCopyCountForRecord } from '../../src/database/queries/books';
+import { insertBookRecord, insertBookCopy, saveCoverImage, deleteCoverImage, getRecordByIsbn, getNextCopyNumber } from '../../src/database/queries/books';
 import { generateId, getDB } from '../../src/database/db';
 import { getAllMainClasses, getSectionsByMainClass, getDivisionsBySection } from '../../src/database/queries/classifications';
 import { RFFC_SUFFIXES, RFFC_TAGS } from '../../src/data/rffcClassifications';
@@ -21,6 +21,19 @@ import type { Library } from '../../src/services/library';
 import type { BookLookupResult, MainClass, Section, Division } from '../../src/types';
 
 type AddMode = 'choose' | 'scan' | 'search' | 'manual';
+
+function isEmpty(v: unknown): boolean {
+  return v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
+}
+
+// Lookup data wins; fields it lacks fall back to the picked search result.
+function fillGaps(primary: BookLookupResult, fallback: BookLookupResult): BookLookupResult {
+  const merged: BookLookupResult = { ...primary };
+  for (const key of Object.keys(fallback) as (keyof BookLookupResult)[]) {
+    if (isEmpty(merged[key])) (merged as any)[key] = fallback[key];
+  }
+  return merged;
+}
 
 export default function AddBookScreen() {
   const router = useRouter();
@@ -73,14 +86,16 @@ export default function AddBookScreen() {
 
   function handleSearchResultSelect(result: BookLookupResult) {
     setFormData({ ...result });
-    const isbn = result.isbn13 ?? '';
+    const isbn = result.isbn13 ? normalizeIsbn(result.isbn13) : '';
     setIsbnInput(isbn);
     setCameFromSearch(true);
     setMode('manual');
-    if (isbn) handleIsbnLookup(isbn);
+    if (isbn) handleIsbnLookup(isbn, result);
   }
 
-  async function handleIsbnLookup(isbn: string) {
+  // `picked` is a search result the user already chose: the full ISBN lookup
+  // enriches it, but must never replace it with nothing if the lookup fails.
+  async function handleIsbnLookup(isbn: string, picked?: BookLookupResult) {
     if (!isbn.trim()) return;
     setLoading(true);
     try {
@@ -92,7 +107,7 @@ export default function AddBookScreen() {
         }
       }
       if (result) {
-        setFormData({ ...result });
+        setFormData(picked ? fillGaps(result, picked) : { ...result });
         if (result.language === 'non-en') {
           Alert.alert(
             'Non-English Edition',
@@ -101,13 +116,15 @@ export default function AddBookScreen() {
         } else if (!result.title && !result.authors?.length) {
           Alert.alert('Not Found', 'No data found for this ISBN. You can fill in the details manually.');
         }
-      } else {
+      } else if (!picked) {
         Alert.alert('Not Found', 'Could not find this book. Fill in the details manually.');
         setFormData({});
       }
     } catch {
-      Alert.alert('Lookup Failed', 'Could not look up this ISBN. Enter details manually.');
-      setFormData({});
+      if (!picked) {
+        Alert.alert('Lookup Failed', 'Could not look up this ISBN. Enter details manually.');
+        setFormData({});
+      }
     } finally {
       setLoading(false);
     }
@@ -174,7 +191,8 @@ export default function AddBookScreen() {
     }
     setLoading(true);
     try {
-      const isbn = isbnInput.trim() || null;
+      // Store the canonical ISBN-13 so hyphenated / ISBN-10 entry matches existing records
+      const isbn = normalizeIsbn(isbnInput) || null;
       const preId = generateId();
 
       const existingRecord = isbn ? getRecordByIsbn(isbn) : null;
@@ -198,7 +216,7 @@ export default function AddBookScreen() {
 
           if (existingRecord) {
             recordId = existingRecord.id;
-            copyNumber = getCopyCountForRecord(recordId) + 1;
+            copyNumber = getNextCopyNumber(recordId);
           } else {
             const authors = formData.authors ?? [];
             recordId = insertBookRecord(
@@ -236,9 +254,7 @@ export default function AddBookScreen() {
         });
       } catch (e) {
         // Transaction rolled back — clean up the downloaded cover file if any.
-        if (coverImage) {
-          FileSystem.deleteAsync(coverImage, { idempotent: true }).catch(() => {});
-        }
+        deleteCoverImage(coverImage).catch(() => {});
         throw e;
       }
 
@@ -315,14 +331,22 @@ export default function AddBookScreen() {
         <CameraView
           style={{ flex: 1 }}
           facing="back"
-          barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8'] }}
+          barcodeScannerSettings={{ barcodeTypes: ['ean13'] }}
           onBarcodeScanned={({ data }) => {
             if (scanned.current) return;
             scanned.current = true;
-            setIsbnInput(data);
+            const isbn = normalizeIsbn(data);
+            if (!isValidIsbn13(isbn)) {
+              // e.g. the price/UPC barcode beside the ISBN — keep the camera open
+              Alert.alert('Not an ISBN', 'That barcode isn\'t a book ISBN. Scan the barcode starting with 978 or 979.', [
+                { text: 'OK', onPress: () => { scanned.current = false; } },
+              ]);
+              return;
+            }
+            setIsbnInput(isbn);
             setCameFromSearch(false);
             setMode('manual');
-            handleIsbnLookup(data);
+            handleIsbnLookup(isbn);
           }}
         />
         <View style={styles.scanOverlay}>
@@ -407,7 +431,7 @@ export default function AddBookScreen() {
         <View style={styles.center}>
           <Ionicons name="book-outline" size={72} color={colors.primary} />
           <Text style={styles.chooseTitle}>Add a Book</Text>
-          <TouchableOpacity style={styles.btn} onPress={() => setMode('scan')}>
+          <TouchableOpacity style={styles.btn} onPress={() => { scanned.current = false; setMode('scan'); }}>
             <Ionicons name="barcode-outline" size={22} color="#fff" style={{ marginRight: spacing.sm }} />
             <Text style={styles.btnText}>Scan Barcode</Text>
           </TouchableOpacity>
