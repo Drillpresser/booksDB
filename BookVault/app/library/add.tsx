@@ -16,7 +16,7 @@ import { generateId, getDB } from '../../src/database/db';
 import { getAllMainClasses, getSectionsByMainClass, getDivisionsBySection } from '../../src/database/queries/classifications';
 import { RFFC_SUFFIXES, RFFC_TAGS } from '../../src/data/rffcClassifications';
 import { getMyLibraries, syncBookToLibraries } from '../../src/services/library';
-import { upsertCommunityBook } from '../../src/services/communityCatalog';
+import { contributeCommunityBook } from '../../src/services/communityCatalog';
 import type { Library } from '../../src/services/library';
 import type { BookLookupResult, MainClass, Section, Division } from '../../src/types';
 
@@ -49,6 +49,9 @@ export default function AddBookScreen() {
   const [classPickerVisible, setClassPickerVisible] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const scanned = useRef(false);
+  // Set when any form data came from Claude's training knowledge rather than a
+  // real catalog — such guesses are never published to the community catalog.
+  const aiSourced = useRef(false);
 
   const [mainClasses, setMainClasses] = useState<MainClass[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
@@ -86,6 +89,7 @@ export default function AddBookScreen() {
 
   function handleSearchResultSelect(result: BookLookupResult) {
     setFormData({ ...result });
+    aiSourced.current = false;
     const isbn = result.isbn13 ? normalizeIsbn(result.isbn13) : '';
     setIsbnInput(isbn);
     setCameFromSearch(true);
@@ -98,12 +102,14 @@ export default function AddBookScreen() {
   async function handleIsbnLookup(isbn: string, picked?: BookLookupResult) {
     if (!isbn.trim()) return;
     setLoading(true);
+    aiSourced.current = false;
     try {
       let result = await lookupByIsbn(isbn.trim());
       if (!result) {
         const hasKey = await getApiKey();
         if (hasKey) {
           result = await lookupBookWithClaude(isbn.trim());
+          aiSourced.current = !!result;
         }
       }
       if (result) {
@@ -139,7 +145,10 @@ export default function AddBookScreen() {
     setLoading(true);
     try {
       const filled = await fillMissingFields(formData);
-      if (filled) setFormData((prev) => ({ ...prev, ...filled }));
+      if (filled) {
+        setFormData((prev) => ({ ...prev, ...filled }));
+        aiSourced.current = true;
+      }
     } catch {
       Alert.alert('Error', 'Claude could not fill in the fields. Please try again.');
     } finally {
@@ -258,11 +267,11 @@ export default function AddBookScreen() {
         throw e;
       }
 
-      // Contribute this book's metadata to the shared catalog so other users
-      // adding the same ISBN receive it. Fire-and-forget; ISBN-less books can't
-      // participate (the catalog is keyed by ISBN).
-      if (isbn) {
-        upsertCommunityBook({
+      // Seed the shared catalog so other users adding this ISBN receive it.
+      // Adding never suggests changes to someone else's entry, and Claude's
+      // guesses are never published. Fire-and-forget.
+      if (isbn && !aiSourced.current) {
+        contributeCommunityBook({
           isbn13: isbn,
           title: formData.title!,
           authors: formData.authors ?? [],
@@ -270,9 +279,9 @@ export default function AddBookScreen() {
           publishedYear: formData.publishedYear ?? null,
           pageCount: formData.pageCount ?? null,
           synopsis: formData.synopsis ?? null,
-          coverUrl: formData.coverUrl ? formData.coverUrl.replace(/^http:\/\//i, 'https://') : null,
+          coverUrl: formData.coverUrl ?? null,
           deweyDecimal: formData.deweyDecimal ?? null,
-        }).catch(() => {});
+        }, { propose: false }).catch(() => {});
       }
 
       if (selectedLibraryIds.length > 0 && newCopyId) {

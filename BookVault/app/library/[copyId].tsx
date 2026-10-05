@@ -16,7 +16,7 @@ import {
   saveLocalCoverImage, deleteCoverImage,
 } from '../../src/database/queries/books';
 import { deriveSortAuthor } from '../../src/services/bookLookup';
-import { upsertCommunityBook } from '../../src/services/communityCatalog';
+import { contributeCommunityBook } from '../../src/services/communityCatalog';
 import { getAllMainClasses, getSectionsByMainClass, getDivisionsBySection } from '../../src/database/queries/classifications';
 import { suggestClassification, getApiKey } from '../../src/services/claude';
 import { getLoanHistoryForCopy, createLoan, returnLoan } from '../../src/database/queries/loans';
@@ -227,10 +227,11 @@ export default function BookDetailScreen() {
     } : prev);
 
     // Contribute the edited metadata to the shared catalog so other users
-    // adding this ISBN receive it. Only remote (http) covers can be shared;
-    // custom on-device covers stay local for now.
+    // adding this ISBN receive it. If someone else contributed the entry, the
+    // edit becomes a suggestion they review. Only catalog-hosted covers are
+    // shared; custom on-device covers stay local.
     if (updatedRecord.isbn13) {
-      upsertCommunityBook({
+      contributeCommunityBook({
         isbn13: updatedRecord.isbn13,
         title,
         authors,
@@ -238,9 +239,18 @@ export default function BookDetailScreen() {
         publishedYear,
         pageCount,
         synopsis,
-        coverUrl: coverImage && /^https?:\/\//i.test(coverImage) ? coverImage : null,
+        coverUrl: coverImage,
         deweyDecimal: updatedRecord.deweyDecimal,
-      }).catch(() => {});
+      }, { propose: true })
+        .then((result) => {
+          if (result === 'proposed') {
+            Alert.alert(
+              'Suggestion Sent',
+              'Your changes are saved in your library. Another reader added this book to the shared catalog, so they\'ll review your changes before others see them.',
+            );
+          }
+        })
+        .catch(() => {});
     }
 
     if (memberLibraryIds.length > 0) {

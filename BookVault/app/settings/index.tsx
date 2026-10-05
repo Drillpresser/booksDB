@@ -13,6 +13,7 @@ import type { LibrarySortMode } from '../../src/database/queries/preferences';
 import { getAllCopies } from '../../src/database/queries/books';
 import { getDB } from '../../src/database/db';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { getPendingEditCount } from '../../src/services/communityCatalog';
 import { AuthSheet } from '../../src/components/AuthSheet';
 import { DisplayNameDialog } from '../../src/components/DisplayNameDialog';
 
@@ -28,6 +29,7 @@ export default function SettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [sortMode, setSortMode] = useState<LibrarySortMode>(getLibrarySort);
   const [volumeCount, setVolumeCount] = useState(0);
+  const [pendingEdits, setPendingEdits] = useState(0);
 
   useEffect(() => {
     getApiKey().then((k) => {
@@ -69,6 +71,13 @@ export default function SettingsScreen() {
     useCallback(() => {
       setSortMode(getLibrarySort());
     }, [])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) { setPendingEdits(0); return; }
+      getPendingEditCount().then(setPendingEdits).catch(() => {});
+    }, [user?.id])
   );
 
   // Cycles through the same sort modes the Library tab offers
@@ -242,6 +251,16 @@ export default function SettingsScreen() {
               <Text style={styles.navRowValue} numberOfLines={1}>{user.user_metadata?.full_name ?? 'Set a name'}</Text>
               <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
+            <TouchableOpacity style={styles.navRow} onPress={() => router.push('/settings/catalog-edits')}>
+              <Ionicons name="git-pull-request-outline" size={22} color={colors.primary} />
+              <Text style={styles.navRowText}>Suggested edits</Text>
+              {pendingEdits > 0 ? (
+                <View style={styles.badge}><Text style={styles.badgeText}>{pendingEdits}</Text></View>
+              ) : (
+                <Text style={styles.navRowValue}>None</Text>
+              )}
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={handleDeleteAccount} disabled={deletingAccount} style={styles.deleteAccountBtn}>
               <Text style={styles.deleteAccountText}>
                 {deletingAccount ? 'Deleting Account…' : 'Delete Account'}
@@ -315,5 +334,7 @@ const styles = StyleSheet.create({
   navRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surfaceCard, borderRadius: 14, padding: spacing.md, borderWidth: 1, borderColor: colors.borderCard },
   navRowText: { flex: 1, fontSize: 16, color: colors.text },
   navRowValue: { fontSize: 14, color: colors.textSecondary },
+  badge: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
+  badgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   accountName: { fontSize: 15, fontWeight: '700', color: colors.text, fontFamily: fonts.serif },
 });

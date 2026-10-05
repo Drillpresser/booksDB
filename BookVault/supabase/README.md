@@ -16,6 +16,7 @@ Files are applied in filename (timestamp) order:
 | 2 | `20240901000100_anon_access.sql` | anon read policies for invite/browse |
 | 3 | `20250801000000_public_directory.sql` | `public_library_directory` view (hides empty shelves) |
 | 4 | `20250801000100_community_books.sql` | shared ISBN-keyed `community_books` catalog |
+| 5 | `20261005000000_community_edit_approval.sql` | contributor-owned catalog entries, `community_book_edits` suggestions, `contribute_community_book` / `review_community_edit` RPCs, field limits |
 
 All migrations are **idempotent** (tables use `IF NOT EXISTS`; policies are
 dropped before being recreated; views use `CREATE OR REPLACE`), so they are

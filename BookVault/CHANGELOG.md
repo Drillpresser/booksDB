@@ -10,6 +10,7 @@ Notable changes to BookHoarder. Versions correspond to iOS build numbers on Test
 - **Shared community catalog** — when you add or edit a book, its metadata is contributed to a shared, ISBN-keyed catalog. When another user adds the same ISBN, the lookup returns the community-curated version, with the external APIs (OpenLibrary / Google Books) filling any gaps. MVP scope: text metadata only (custom covers stay on-device), last-write-wins, and it seeds new adds rather than back-filling copies already added.
 
 ### Changed
+- **Community catalog edits need the contributor's approval** — the reader who first adds a book to the shared catalog owns that entry. Their own edits apply directly; anyone else's Edit Details changes become a suggestion ("Suggestion Sent") that the contributor approves or rejects from Settings → Account → Suggested edits, which shows each change as old → new. Adding a book never changes or suggests changes to an existing entry, and details guessed by Claude are never published. Covers are only shared from OpenLibrary/Google, and field lengths are capped.
 - **Search results survive opening a result** — in Add Book, selecting a search result and then going back now returns to the results list ("Back to results") instead of resetting the search.
 - **"Ask Claude" buttons only show with an API key** — the classification-suggestion and fill-missing-fields buttons on the Add and detail screens are hidden unless an Anthropic API key is saved, instead of always showing and alerting on tap.
 - **Empty shelves are hidden from public browse** — public shelves with no books no longer appear in Browse until they contain at least one book.
@@ -33,6 +34,7 @@ Notable changes to BookHoarder. Versions correspond to iOS build numbers on Test
 ### Backend (Supabase)
 - **`community_books` table** — shared, ISBN-keyed metadata catalog with RLS (readable by any authenticated user; last-write-wins writes attributed via `updated_by`).
 - **`public_library_directory` view** — public shelves with at least one book, with owner display name and book count precomputed; powers Browse and excludes empty shelves at the database level.
+- **Catalog edit approval** (`20261005000000_community_edit_approval.sql`) — `community_books.created_by` ownership (backfilled from `updated_by`; orphaned entries are adopted by the next contributor), `community_book_edits` suggestions table with RLS (proposer + owner read, proposer withdraws pending), writes only through SECURITY DEFINER RPCs `contribute_community_book` / `review_community_edit` (direct insert/update policies removed), validated field limits and a cover-host allow-list. Existing rows are cleaned to fit: rows with non-ISBN-13 keys or blank titles are deleted, `http` covers upgraded and foreign covers removed, over-long text trimmed. Tested against a throwaway Postgres 17 with simulated users.
 - **Migrations are now CLI-managed and auto-deployed** — the hand-run SQL files moved into `supabase/migrations/` (idempotent) and a GitHub Actions workflow runs `supabase db push` against the linked project on pushes to `main`.
 
 ## [Build 14] — 2026-07-12 (TestFlight)
