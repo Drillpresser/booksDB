@@ -15,6 +15,8 @@ Notable changes to BookHoarder. Versions correspond to iOS build numbers on Test
 - **Empty shelves are hidden from public browse** — public shelves with no books no longer appear in Browse until they contain at least one book.
 
 ### Fixed
+- **Shelf management features were unreachable** — the shelf screen opened from the Shelves tab was an older duplicate. The per-book Remove list (listed under Build 14) and live updates for card applications and book requests lived in a Settings copy of the screen that nothing navigated to. The Shelves tab now uses the full screen, and the orphaned `app/settings/library/` copy (including its never-reachable "make all shelves public/private" toggle) is removed.
+- **Books returned from the Lending tab stayed "on loan" on shared shelves** — "Mark Returned" on the Lending tab updated the local loan but never cleared the shelf copy's on-loan flag (the book detail and patron screens already did). It now syncs like the other return paths.
 - **Orphaned shelf entries are now removable** — if a copy was deleted with "Keep on Shelves", navigating to its detail showed a dead-end "Book not found." screen. It now shows a "Remove from All Shelves" button to clean up the dangling shelf entry.
 - **Shelf pills only show shelves you own** — cardholders of a public shelf were seeing a pill on book detail and add screens that let them add books to that shelf (an action only the owner can perform). `getMyLibraries` now filters by `owner_id` so member-only shelves never appear in the UI.
 

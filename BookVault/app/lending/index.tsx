@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fonts, spacing, radius } from '../../src/theme';
 import { getActiveLoans, getAllReturnedLoans, returnLoan } from '../../src/database/queries/loans';
+import { updateBookLoanStatus } from '../../src/services/library';
 import type { LoanWithDetails } from '../../src/types';
 
 type Tab = 'active' | 'history';
@@ -70,6 +71,7 @@ export default function LendingScreen() {
           text: 'Returned',
           onPress: () => {
             returnLoan(loan.id, new Date().toISOString());
+            updateBookLoanStatus(loan.copyId, false).catch(() => {});
             setLoans(getActiveLoans());
             setHistory(getAllReturnedLoans());
           },
