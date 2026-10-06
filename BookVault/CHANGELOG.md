@@ -4,13 +4,15 @@ Notable changes to BookHoarder. Versions correspond to iOS build numbers on Test
 
 ## [Unreleased]
 
+## [Build 20] — 2026-10-05 (TestFlight)
+
 ### Added
 - **Edit every book detail in one place** — the book detail screen's pencil opens an "Edit Details" sheet that edits cover image, title, author(s), publisher, year, pages, synopsis, classification (3-step Class → Section → Division picker), and Level 4 format/tags. Classification, format, and tag editing (previously inline on the detail screen) now live here too; the detail body shows them read-only and taps through to the editor. Edits are drafted and saved together, then synced to Supabase shelves. An "Ask Claude to suggest classification" button appears in the sheet, proposing the division plus Level 4 suffix and tags in one shot.
 - **Set a custom cover image** — a book's cover can be chosen from the photo library or removed from the Edit Details sheet. Picked images are copied into the app's covers directory (adds the `expo-image-picker` native module, so this feature needs a new build).
-- **Shared community catalog** — when you add or edit a book, its metadata is contributed to a shared, ISBN-keyed catalog. When another user adds the same ISBN, the lookup returns the community-curated version, with the external APIs (OpenLibrary / Google Books) filling any gaps. MVP scope: text metadata only (custom covers stay on-device), last-write-wins, and it seeds new adds rather than back-filling copies already added.
+- **Shared community catalog** — when you add or edit a book, its metadata is contributed to a shared, ISBN-keyed catalog. When another user adds the same ISBN, the lookup returns the community-curated version, with the external APIs (OpenLibrary / Google Books) filling any gaps. MVP scope: text metadata only (custom covers stay on-device), and it seeds new adds rather than back-filling copies already added.
+- **Catalog edits need the contributor's approval** — the reader who first adds a book to the shared catalog owns that entry. Their own edits apply directly; anyone else's Edit Details changes become a suggestion ("Suggestion Sent") that the contributor approves or rejects from Settings → Account → Suggested edits, which shows each change as old → new. Adding a book never changes or suggests changes to an existing entry, and details guessed by Claude are never published. Covers are only shared from OpenLibrary/Google, and field lengths are capped.
 
 ### Changed
-- **Community catalog edits need the contributor's approval** — the reader who first adds a book to the shared catalog owns that entry. Their own edits apply directly; anyone else's Edit Details changes become a suggestion ("Suggestion Sent") that the contributor approves or rejects from Settings → Account → Suggested edits, which shows each change as old → new. Adding a book never changes or suggests changes to an existing entry, and details guessed by Claude are never published. Covers are only shared from OpenLibrary/Google, and field lengths are capped.
 - **Search results survive opening a result** — in Add Book, selecting a search result and then going back now returns to the results list ("Back to results") instead of resetting the search.
 - **"Ask Claude" buttons only show with an API key** — the classification-suggestion and fill-missing-fields buttons on the Add and detail screens are hidden unless an Anthropic API key is saved, instead of always showing and alerting on tap.
 - **Empty shelves are hidden from public browse** — public shelves with no books no longer appear in Browse until they contain at least one book.
@@ -28,14 +30,28 @@ Notable changes to BookHoarder. Versions correspond to iOS build numbers on Test
 - **"BookVault" in user-facing text** — the patron shelf invite and library export now say BookHoarder.
 - **Shelf management features were unreachable** — the shelf screen opened from the Shelves tab was an older duplicate. The per-book Remove list (listed under Build 14) and live updates for card applications and book requests lived in a Settings copy of the screen that nothing navigated to. The Shelves tab now uses the full screen, and the orphaned `app/settings/library/` copy (including its never-reachable "make all shelves public/private" toggle) is removed.
 - **Books returned from the Lending tab stayed "on loan" on shared shelves** — "Mark Returned" on the Lending tab updated the local loan but never cleared the shelf copy's on-loan flag (the book detail and patron screens already did). It now syncs like the other return paths.
-- **Orphaned shelf entries are now removable** — if a copy was deleted with "Keep on Shelves", navigating to its detail showed a dead-end "Book not found." screen. It now shows a "Remove from All Shelves" button to clean up the dangling shelf entry.
-- **Shelf pills only show shelves you own** — cardholders of a public shelf were seeing a pill on book detail and add screens that let them add books to that shelf (an action only the owner can perform). `getMyLibraries` now filters by `owner_id` so member-only shelves never appear in the UI.
 
 ### Backend (Supabase)
-- **`community_books` table** — shared, ISBN-keyed metadata catalog with RLS (readable by any authenticated user; last-write-wins writes attributed via `updated_by`).
+- **`community_books` table** (deployed 2026-08-08) — shared, ISBN-keyed metadata catalog with RLS, readable by any authenticated user. Its original open write policies (any signed-in user could overwrite any entry) were replaced by the approval migration below before any app build wrote to it.
 - **`public_library_directory` view** — public shelves with at least one book, with owner display name and book count precomputed; powers Browse and excludes empty shelves at the database level.
 - **Catalog edit approval** (`20261005000000_community_edit_approval.sql`) — `community_books.created_by` ownership (backfilled from `updated_by`; orphaned entries are adopted by the next contributor), `community_book_edits` suggestions table with RLS (proposer + owner read, proposer withdraws pending), writes only through SECURITY DEFINER RPCs `contribute_community_book` / `review_community_edit` (direct insert/update policies removed), validated field limits and a cover-host allow-list. Existing rows are cleaned to fit: rows with non-ISBN-13 keys or blank titles are deleted, `http` covers upgraded and foreign covers removed, over-long text trimmed. Tested against a throwaway Postgres 17 with simulated users.
 - **Migrations are now CLI-managed and auto-deployed** — the hand-run SQL files moved into `supabase/migrations/` (idempotent) and a GitHub Actions workflow runs `supabase db push` against the linked project on pushes to `main`.
+
+### Notes
+- iOS build numbers now come from EAS (`appVersionSource: remote`). Builds 17–18 were never created (the counter advanced without a build) and build 19 failed on the EAS worker (lost connection), so 20 is the first build of this release.
+- Opening this build runs local schema v6, a one-time conversion of stored ISBNs to ISBN-13.
+- Pushing to `main` does not start an EAS build; builds are run manually with `eas build --auto-submit`.
+
+## [Builds 15–16] — 2026-07-19 / 2026-08-08 (TestFlight)
+
+Both built from the same commit; 16 is a rebuild of 15.
+
+### Added
+- **Classify books from the detail screen** — books without a classification showed a "Classify this book" row; classified books showed a pencil icon on the classification card. Both opened the 3-step picker (Class → Section → Division), alongside an "Ask Claude to suggest classification" button proposing the division plus Level 4 suffix and tags. Changes synced to Supabase shelves immediately. (Folded into the Edit Details sheet in Build 20.)
+
+### Fixed
+- **Orphaned shelf entries are now removable** — if a copy was deleted with "Keep on Shelves", navigating to its detail showed a dead-end "Book not found." screen. It now shows a "Remove from All Shelves" button to clean up the dangling shelf entry.
+- **Shelf pills only show shelves you own** — cardholders of a public shelf were seeing a pill on book detail and add screens that let them add books to that shelf (an action only the owner can perform). `getMyLibraries` now filters by `owner_id` so member-only shelves never appear in the UI.
 
 ## [Build 14] — 2026-07-12 (TestFlight)
 
