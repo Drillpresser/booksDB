@@ -12,4 +12,4 @@
 delete from library_cards
 where status = 'invite'
   and user_id is null
-  and created_at < '2026-10-06T03:37:27Z'  -- when the re-hardening deployed;
+  and created_at < '2026-10-06T03:37:27Z'; -- when the re-hardening deployed
