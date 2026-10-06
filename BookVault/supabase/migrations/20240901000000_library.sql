@@ -1,3 +1,7 @@
+-- WARNING: several policies below are superseded and must not be reused. They
+-- re-opened invite-token exposure and self-approval when CI first applied this
+-- file on 2026-08-08; 20261006000000_reharden_shelf_policies.sql replaces them.
+
 -- Core library schema: libraries, library_books, library_cards, book_requests,
 -- with RLS. Idempotent so it can be applied to a database that was previously
 -- provisioned by hand (tables use IF NOT EXISTS; policies are dropped first).
