@@ -18,6 +18,7 @@ Files are applied in filename (timestamp) order:
 | 4 | `20250801000100_community_books.sql` | shared ISBN-keyed `community_books` catalog |
 | 5 | `20261005000000_community_edit_approval.sql` | contributor-owned catalog entries, `community_book_edits` suggestions, `contribute_community_book` / `review_community_edit` RPCs, field limits |
 | 6 | `20261006000000_reharden_shelf_policies.sql` | re-applies the July shelf hardening (owner-only card/request updates, no invite-row access) that files 1–2 reverted on their first CI deploy |
+| 7 | `20261006000100_revoke_exposed_invites.sql` | deletes unclaimed invites issued before the re-hardening (their tokens were publicly readable) |
 
 All migrations are **idempotent** (tables use `IF NOT EXISTS`; policies are
 dropped before being recreated; views use `CREATE OR REPLACE`), so they are
