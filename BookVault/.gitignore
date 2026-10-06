@@ -20,3 +20,6 @@ testflight_feedback_extracted/
 minecraft-spiral-layer-0.png
 *.dc.html
 BookVault App.html
+
+# Supabase CLI local state (link info, version cache, schema exports)
+supabase/.temp/

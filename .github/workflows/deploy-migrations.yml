@@ -37,5 +37,9 @@ jobs:
       - name: Link project
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
 
+      # --include-all also applies a migration whose timestamp is older than the
+      # newest one already applied (e.g. 20240831000000, which captures tables
+      # created by hand before migrations existed). Every migration here is
+      # idempotent, so re-declaring existing objects is safe.
       - name: Push migrations
-        run: supabase db push
+        run: supabase db push --include-all
