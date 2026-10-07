@@ -4,6 +4,12 @@ Notable changes to BookHoarder. Versions correspond to iOS build numbers on Test
 
 ## [Unreleased]
 
+### Added
+- **Privacy Policy and Help & Support links** in Settings → About. They open the new pages in the repo's `docs/` folder (served by GitHub Pages), which replace the unfilled `privacy-policy.html` template. App Store Connect needs the privacy and support URLs, and the policy must also be reachable in-app.
+
+### Changed
+- The Claude API key note in Settings no longer says the key "never leaves your phone". It is sent to Anthropic with each Claude request.
+
 ### Security (Supabase)
 - **Re-closed shelf privilege-escalation holes** (`20261006000000_reharden_shelf_policies.sql`) — the repo's original shelf migrations still held the pre-July policies, and CI's first `supabase db push` (2026-08-08) re-created them next to the hardened ones. From then until this fix, unclaimed invite tokens were readable (even signed out), any signed-in user could claim an invite card without its token, and applicants/requesters could approve their own cards and requests. The migration drops those policies and restores owner-only updates with no direct access to invite rows (invites go through `get_invite` / `claim_invite`). Verified against the vulnerable state: 6 exploits reproduced before, all blocked after, owner/cardholder flows unaffected.
 - **Revoked exposed invites** (`20261006000100_revoke_exposed_invites.sql`) — every unclaimed invite created before the fix deployed is deleted, since its token was publicly readable. Old links now show "Invite Not Found"; owners re-share from the shelf screen. An audit of members and approvals since 2026-08-08 found no abuse.

@@ -16,6 +16,11 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { getPendingEditCount } from '../../src/services/communityCatalog';
 import { AuthSheet } from '../../src/components/AuthSheet';
 import { DisplayNameDialog } from '../../src/components/DisplayNameDialog';
+import * as WebBrowser from 'expo-web-browser';
+
+// Served by GitHub Pages from the repo's docs/ folder
+const SUPPORT_URL = 'https://drillpresser.github.io/booksDB/';
+const PRIVACY_URL = `${SUPPORT_URL}privacy.html`;
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -151,7 +156,7 @@ export default function SettingsScreen() {
           <Text style={styles.sectionTitle}>Claude AI</Text>
           <Text style={styles.sectionDesc}>
             Add your Anthropic API key to enable Claude features: filling missing book fields and suggesting classifications.
-            Your key is stored securely on-device and never leaves your phone.
+            Your key is stored securely on-device and is only ever sent to Anthropic.
           </Text>
 
           {hasKey && (
@@ -292,6 +297,16 @@ export default function SettingsScreen() {
           <Text style={styles.sectionTitle}>About</Text>
           <Text style={styles.sectionDesc}>BookHoarder — Personal Library Catalog</Text>
           <Text style={styles.hint}>Version 1.0.0</Text>
+          <TouchableOpacity style={styles.navRow} onPress={() => WebBrowser.openBrowserAsync(PRIVACY_URL)}>
+            <Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} />
+            <Text style={styles.navRowText}>Privacy Policy</Text>
+            <Ionicons name="open-outline" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.navRow} onPress={() => WebBrowser.openBrowserAsync(SUPPORT_URL)}>
+            <Ionicons name="help-circle-outline" size={22} color={colors.primary} />
+            <Text style={styles.navRowText}>Help & Support</Text>
+            <Ionicons name="open-outline" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
       </ScrollView>
 

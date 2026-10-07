@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BookHoarder Privacy Policy</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <p class="app">BookHoarder</p>
+  <h1>Privacy Policy</h1>
+  <p class="meta">Effective October 7, 2026 · Last updated October 7, 2026</p>
+
+  <section class="summary">
+    <h2>The short version</h2>
+    <ul>
+      <li>Your book catalog, patrons (contacts), and loans are stored <strong>only on your device</strong>.</li>
+      <li>An account is optional. If you sign in, we store your account details and whatever you choose to share: shelves, ratings, reviews, requests, and book details.</li>
+      <li>We don't run ads, use analytics or tracking SDKs, or sell or share your data with anyone for marketing.</li>
+      <li>You can delete your account and its data from inside the app at any time.</li>
+    </ul>
+  </section>
+
+  <h2>Who we are</h2>
+  <p>BookHoarder is an app for cataloging and lending a personal book collection. It is built and run by an independent developer ("we", "us"). Questions about this policy can go to <a href="mailto:[CONTACT EMAIL]">[CONTACT EMAIL]</a>.</p>
+
+  <h2>Data that stays on your device</h2>
+  <p>The following data is kept in a database on your phone. It is never sent to us:</p>
+  <ul>
+    <li>Your books and copies: titles, authors, ISBNs, classifications, notes, personal ratings, and cover images (including photos you pick from your library).</li>
+    <li>Patrons (contacts): names, phone numbers, email addresses, and notes you enter.</li>
+    <li>Loan history: who has which book and when it is due.</li>
+    <li>Your Anthropic API key, if you add one. It is kept in the device's secure keychain.</li>
+  </ul>
+  <p>If you use <em>Export library</em>, the app builds a file of this data and passes it to the iOS share sheet. Where it goes from there is up to you.</p>
+  <p>If you delete the app, this data is deleted too, apart from any copy kept in your device backups.</p>
+
+  <h2>Data stored when you sign in</h2>
+  <p>You don't need an account to use BookHoarder. Shared shelves, community ratings, and the shared book catalog require one. Signing in with Apple, Google, or email and password stores the following on our backend, which is hosted by <a href="https://supabase.com/privacy">Supabase</a>:</p>
+  <table>
+    <thead><tr><th>Data</th><th>Why</th><th>Who can see it</th></tr></thead>
+    <tbody>
+      <tr><td>Email address and sign-in provider. With Apple's "Hide My Email", this is a private relay address.</td><td>Signing you in and account recovery</td><td>Only you and us</td></tr>
+      <tr><td>Display name. This starts from the name your sign-in provider gives us and can be changed at any time in Settings.</td><td>Shown on your shelves, reviews, and requests</td><td>Anyone using the app</td></tr>
+      <tr><td>Profile picture URL, if Google provides one</td><td>Stored with your profile</td><td>Anyone using the app</td></tr>
+      <tr><td>Ratings and reviews you post</td><td>Community ratings</td><td>Anyone using the app</td></tr>
+      <tr><td>Shelves you create: name, description, and a copy of the details of the books you put on them, including whether a copy is currently on loan. Borrowers' identities are never included.</td><td>Sharing shelves</td><td>Public shelves: anyone using the app. Private shelves: you and approved cardholders.</td></tr>
+      <tr><td>Library-card applications, invites, and book requests, including any message you write</td><td>Borrowing from shared shelves</td><td>You and that shelf's owner</td></tr>
+      <tr><td>Book details you contribute to the shared catalog, and edits you suggest</td><td>Helping other readers look up books</td><td>Catalog entries: signed-in users. Suggestions: you and the entry's contributor.</td></tr>
+    </tbody>
+  </table>
+  <p>Your session token is stored in the device's secure keychain.</p>
+
+  <h2>Third-party services the app talks to</h2>
+  <ul>
+    <li><strong>Open Library</strong> (Internet Archive) and <strong>Google Books</strong>: when you scan, search for, or look up a book, the ISBN or search text is sent to them to fetch book details and covers. No account information is sent. See the <a href="https://archive.org/about/terms">Internet Archive</a> and <a href="https://policies.google.com/privacy">Google</a> privacy policies.</li>
+    <li><strong>Anthropic (Claude)</strong>: only if you add your own API key and use an "Ask Claude" feature. The app then sends the book's details (and, for classification suggestions, your classification scheme) straight from your device to Anthropic under your own key. This goes through your own account with Anthropic and their <a href="https://www.anthropic.com/legal/privacy">privacy policy</a> applies. It does not pass through us.</li>
+    <li><strong>Apple</strong> and <strong>Google</strong> sign-in: these handle authentication under their own privacy policies.</li>
+    <li><strong>Supabase</strong>: hosts our database and sign-in, as described above.</li>
+  </ul>
+  <p>The app has no advertising, analytics, or crash-reporting SDKs, and does not track you across other apps or websites.</p>
+
+  <h2>Camera and photos</h2>
+  <p>The camera is used only to scan book barcodes on the device, and no images are kept or uploaded. Photos you pick as custom covers are copied into the app's own storage on your device. They are not uploaded.</p>
+
+  <h2>Keeping and deleting your data</h2>
+  <p>Account data is kept until you delete your account. To delete it, go to <strong>Settings → Account → Delete Account</strong>. This permanently removes your account, profile, ratings and reviews, shelves and the books on them, library cards, requests, and suggested edits. Book details you contributed to the shared catalog stay available to other readers, but they are no longer linked to you. Deleting your account does not touch the data stored only on your device. If you can't access the app, email us and we will delete your account for you.</p>
+
+  <h2>Children</h2>
+  <p>BookHoarder is not directed at children under 13, and we do not knowingly collect personal information from them. If you think a child has created an account, contact us and we will delete it.</p>
+
+  <h2>Your rights</h2>
+  <p>Depending on where you live, you may have the right to access, correct, export, or delete your personal data. You can change most of it directly in the app. For anything else, email us and we will respond within 30 days.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes, we will update the date at the top of this page. If a change is significant, we will also announce it in the app.</p>
+
+  <p class="footer"><a href="./">BookHoarder support</a></p>
+</main>
+</body>
+</html>
