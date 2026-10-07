@@ -9,6 +9,7 @@ import { colors, fonts, spacing, radius } from '../../src/theme';
 import { getPendingEditsForMyBooks, reviewCommunityEdit } from '../../src/services/communityCatalog';
 import type { CommunityEdit, CommunityEditChanges } from '../../src/services/communityCatalog';
 import { formatDate } from '../../src/lib/dates';
+import { openModerationMenu } from '../../src/components/moderationMenu';
 
 const FIELD_LABELS: Record<keyof CommunityEditChanges, string> = {
   title: 'Title',
@@ -96,9 +97,21 @@ export default function CatalogEditsScreen() {
           return (
             <View style={styles.card}>
               <Text style={styles.bookTitle} numberOfLines={2}>{item.current.title ?? item.isbn13}</Text>
-              <Text style={styles.meta}>
-                Suggested by {item.proposerName} · {formatDate(item.createdAt)} · ISBN {item.isbn13}
-              </Text>
+              <View style={styles.metaRow}>
+                <Text style={[styles.meta, { flex: 1 }]}>
+                  Suggested by {item.proposerName} · {formatDate(item.createdAt)} · ISBN {item.isbn13}
+                </Text>
+                <TouchableOpacity
+                  hitSlop={8}
+                  accessibilityLabel="Report or block"
+                  onPress={() => openModerationMenu({
+                    contentType: 'catalog_edit', contentId: item.id, contentLabel: 'suggestion',
+                    userId: item.proposedBy, userName: item.proposerName, signedIn: true, onBlocked: load,
+                  })}
+                >
+                  <Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
               {fields.map((field) => (
                 <View key={field} style={styles.change}>
                   <Text style={styles.fieldLabel}>{FIELD_LABELS[field] ?? field}</Text>
@@ -132,6 +145,7 @@ export default function CatalogEditsScreen() {
 }
 
 const styles = StyleSheet.create({
+  metaRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: spacing.md, gap: spacing.md },

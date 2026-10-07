@@ -9,6 +9,7 @@ import { colors, spacing, radius } from '../theme';
 import { useAuth } from '../contexts/AuthContext';
 import { AuthSheet } from './AuthSheet';
 import { getRatingsForIsbn, upsertRating, deleteRating, RatingSummary } from '../services/ratings';
+import { openModerationMenu } from './moderationMenu';
 
 type Props = {
   isbn: string;
@@ -154,6 +155,18 @@ export function CommunityRatings({ isbn, localRating, onLocalRating }: Props) {
                   <StarDisplay rating={r.stars} size={14} />
                 </View>
                 <Text style={styles.reviewDate}>{formatDate(r.createdAt)}</Text>
+                {r.userId !== user?.id && (
+                  <TouchableOpacity
+                    hitSlop={8}
+                    accessibilityLabel="Report or block"
+                    onPress={() => openModerationMenu({
+                      contentType: 'review', contentId: r.id, contentLabel: 'review',
+                      userId: r.userId, userName: r.displayName, signedIn: !!user, onBlocked: load,
+                    })}
+                  >
+                    <Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
               </View>
               {r.review ? <Text style={styles.reviewText}>{r.review}</Text> : null}
             </View>

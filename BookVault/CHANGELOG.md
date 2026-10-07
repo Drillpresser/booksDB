@@ -7,6 +7,13 @@ Notable changes to BookHoarder. Versions correspond to iOS build numbers on Test
 ### Added
 - **Privacy Policy and Help & Support links** in Settings → About. They open the new pages in the repo's `docs/` folder (served by GitHub Pages), which replace the unfilled `privacy-policy.html` template. App Store Connect needs the privacy and support URLs, and the policy must also be reachable in-app.
 
+- **Report and block** (App Store Guideline 1.2). A ⋯ button on other readers' reviews, on shared shelves (in the header), on card applications, cardholders and book requests on your shelves, and on suggested catalog edits opens **Report** and **Block**.
+  - Reports go to the developer with the reason and a server-side snapshot of the content. Signed-out viewers can report by email.
+  - Blocking someone hides their reviews, shelves, applications, requests and suggestions from you. It also stops them applying to or requesting from your shelves and removes their existing cards and requests there.
+  - Blocked users are managed in Settings → Account → **Blocked users**.
+  - Enforced in the database: migration `20261007000000_report_and_block.sql` adds restrictive RLS policies, plus `report_content()` and a block trigger. It was tested against a database rebuilt from all migrations; the moderation runbook is in `supabase/tools/MODERATION.md`.
+- **Terms of Use** (`docs/terms.html`), including no tolerance for objectionable content. The sign-in sheet now says that continuing means agreeing to the Terms and Privacy Policy, and Settings → About links to the Terms.
+
 ### Changed
 - The Claude API key note in Settings no longer says the key "never leaves your phone". It is sent to Anthropic with each Claude request.
 

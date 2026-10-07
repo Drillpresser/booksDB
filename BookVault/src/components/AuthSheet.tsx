@@ -6,6 +6,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as WebBrowser from 'expo-web-browser';
+import { PRIVACY_URL, TERMS_URL } from '../lib/links';
 import { colors, spacing, radius } from '../theme';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -164,6 +166,13 @@ export function AuthSheet({ visible, onClose }: Props) {
                 <Text style={styles.toggleLink}>{mode === 'signin' ? 'Sign up' : 'Sign in'}</Text>
               </Text>
             </TouchableOpacity>
+
+            <Text style={styles.legal}>
+              By continuing you agree to the{' '}
+              <Text style={styles.legalLink} onPress={() => WebBrowser.openBrowserAsync(TERMS_URL)}>Terms of Use</Text>
+              {', including no tolerance for abusive or objectionable content, and the '}
+              <Text style={styles.legalLink} onPress={() => WebBrowser.openBrowserAsync(PRIVACY_URL)}>Privacy Policy</Text>.
+            </Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -190,4 +199,6 @@ const styles = StyleSheet.create({
   toggleBtn: { paddingVertical: spacing.sm },
   toggleText: { fontSize: 14, color: colors.textSecondary },
   toggleLink: { color: colors.primary, fontWeight: '700' },
+  legal: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', lineHeight: 18 },
+  legalLink: { color: colors.primary, fontWeight: '600' },
 });

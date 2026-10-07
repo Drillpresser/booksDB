@@ -17,10 +17,7 @@ import { getPendingEditCount } from '../../src/services/communityCatalog';
 import { AuthSheet } from '../../src/components/AuthSheet';
 import { DisplayNameDialog } from '../../src/components/DisplayNameDialog';
 import * as WebBrowser from 'expo-web-browser';
-
-// Served by GitHub Pages from the repo's docs/ folder
-const SUPPORT_URL = 'https://drillpresser.github.io/booksDB/';
-const PRIVACY_URL = `${SUPPORT_URL}privacy.html`;
+import { PRIVACY_URL, SUPPORT_URL, TERMS_URL } from '../../src/lib/links';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -266,6 +263,11 @@ export default function SettingsScreen() {
               )}
               <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
+            <TouchableOpacity style={styles.navRow} onPress={() => router.push('/settings/blocked-users')}>
+              <Ionicons name="ban-outline" size={22} color={colors.primary} />
+              <Text style={styles.navRowText}>Blocked users</Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={handleDeleteAccount} disabled={deletingAccount} style={styles.deleteAccountBtn}>
               <Text style={styles.deleteAccountText}>
                 {deletingAccount ? 'Deleting Account…' : 'Delete Account'}
@@ -300,6 +302,11 @@ export default function SettingsScreen() {
           <TouchableOpacity style={styles.navRow} onPress={() => WebBrowser.openBrowserAsync(PRIVACY_URL)}>
             <Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} />
             <Text style={styles.navRowText}>Privacy Policy</Text>
+            <Ionicons name="open-outline" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.navRow} onPress={() => WebBrowser.openBrowserAsync(TERMS_URL)}>
+            <Ionicons name="document-text-outline" size={22} color={colors.primary} />
+            <Text style={styles.navRowText}>Terms of Use</Text>
             <Ionicons name="open-outline" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.navRow} onPress={() => WebBrowser.openBrowserAsync(SUPPORT_URL)}>

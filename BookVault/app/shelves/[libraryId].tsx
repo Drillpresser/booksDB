@@ -14,6 +14,8 @@ import {
 } from '../../src/services/library';
 import type { Library, LibraryCard, BookRequest, LibraryBook } from '../../src/services/library';
 import { supabase } from '../../src/lib/supabase';
+import { openModerationMenu } from '../../src/components/moderationMenu';
+import type { ReportContentType } from '../../src/services/moderation';
 
 export default function ManageShelfScreen() {
   const { libraryId } = useLocalSearchParams<{ libraryId: string }>();
@@ -286,6 +288,10 @@ export default function ManageShelfScreen() {
                     {c.message ? <Text style={styles.cardMessage} numberOfLines={2}>{c.message}</Text> : null}
                   </View>
                   <View style={styles.cardActions}>
+                    <MoreButton
+                      type="card" id={c.id} label="application"
+                      userId={c.userId} userName={c.requesterDisplayName} onBlocked={load}
+                    />
                     <TouchableOpacity
                       style={styles.approveBtn}
                       onPress={() => handleCardAction(c.id, 'approved')}
@@ -318,6 +324,10 @@ export default function ManageShelfScreen() {
                     </Text>
                   </View>
                   <Text style={[styles.cardName, { flex: 1 }]}>{c.requesterDisplayName ?? 'Member'}</Text>
+                  <MoreButton
+                    type="card" id={c.id} label="cardholder"
+                    userId={c.userId} userName={c.requesterDisplayName} onBlocked={load}
+                  />
                   <TouchableOpacity
                     style={styles.removeCardBtn}
                     onPress={() =>
@@ -350,6 +360,10 @@ export default function ManageShelfScreen() {
                     {r.notes ? <Text style={styles.requestNotes} numberOfLines={1}>{r.notes}</Text> : null}
                   </View>
                   <View style={styles.requestActions}>
+                    <MoreButton
+                      type="request" id={r.id} label="request"
+                      userId={r.requesterId} userName={r.requesterDisplayName} onBlocked={load}
+                    />
                     <TouchableOpacity
                       style={styles.fulfillBtn}
                       onPress={() => handleRequestAction(r.id, 'fulfilled')}
@@ -403,7 +417,29 @@ export default function ManageShelfScreen() {
   );
 }
 
+// Report / Block for a patron's application, card, or request. Blocking
+// removes their cards and requests on your shelves.
+function MoreButton({ type, id, label, userId, userName, onBlocked }: {
+  type: ReportContentType; id: string; label: string;
+  userId: string | null; userName: string | null; onBlocked: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={styles.moreBtn}
+      hitSlop={6}
+      accessibilityLabel="Report or block"
+      onPress={() => openModerationMenu({
+        contentType: type, contentId: id, contentLabel: label,
+        userId, userName: userName ?? 'this patron', signedIn: true, onBlocked,
+      })}
+    >
+      <Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} />
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
+  moreBtn: { padding: spacing.xs, justifyContent: 'center' },
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   notFound: { fontSize: 16, color: colors.textSecondary },

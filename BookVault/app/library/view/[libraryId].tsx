@@ -16,6 +16,7 @@ import {
 } from '../../../src/services/library';
 import type { Library, LibraryBook, LibraryCard } from '../../../src/services/library';
 import { supabase } from '../../../src/lib/supabase';
+import { openModerationMenu } from '../../../src/components/moderationMenu';
 
 export default function LibraryViewScreen() {
   const { libraryId } = useLocalSearchParams<{ libraryId: string }>();
@@ -88,6 +89,18 @@ export default function LibraryViewScreen() {
     } finally {
       setApplying(false);
     }
+  }
+
+  async function handleModerate() {
+    if (!library) return;
+    const { data } = await supabase.from('profiles').select('display_name').eq('id', library.ownerId).maybeSingle();
+    openModerationMenu({
+      contentType: 'shelf', contentId: library.id, contentLabel: 'shelf',
+      userId: library.ownerId, userName: (data as any)?.display_name ?? 'the owner',
+      signedIn: !!user,
+      // Their shelves are hidden from you now
+      onBlocked: () => router.back(),
+    });
   }
 
   async function handleRequest() {
@@ -169,7 +182,16 @@ export default function LibraryViewScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={[]}>
-      <Stack.Screen options={{ title: library.name }} />
+      <Stack.Screen
+        options={{
+          title: library.name,
+          headerRight: isOwner ? undefined : () => (
+            <TouchableOpacity onPress={handleModerate} hitSlop={8} accessibilityLabel="Report or block">
+              <Ionicons name="ellipsis-horizontal-circle-outline" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          ),
+        }}
+      />
 
       <FlatList
         data={books}
