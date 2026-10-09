@@ -153,7 +153,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function deleteAccount() {
-    const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
+    // Apple requires revoking Sign in with Apple tokens on deletion. We never keep
+    // an Apple refresh token, so re-authorize now and let the server exchange the
+    // fresh code and revoke it. Cancelling here (ERR_REQUEST_CANCELED) aborts deletion.
+    let appleAuthorizationCode: string | undefined;
+    const isAppleUser = session?.user.identities?.some((i) => i.provider === 'apple');
+    if (isAppleUser && Platform.OS === 'ios') {
+      const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });
+      appleAuthorizationCode = credential.authorizationCode ?? undefined;
+    }
+
+    const { error } = await supabase.functions.invoke('delete-account', {
+      method: 'POST',
+      body: { appleAuthorizationCode },
+    });
     if (error) {
       throw new Error(error.message ?? 'Could not delete account.');
     }

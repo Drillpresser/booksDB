@@ -14,6 +14,8 @@ Notable changes to BookHoarder. Versions correspond to iOS build numbers on Test
   - Enforced in the database: migration `20261007000000_report_and_block.sql` adds restrictive RLS policies, plus `report_content()` and a block trigger. It was tested against a database rebuilt from all migrations; the moderation runbook is in `supabase/tools/MODERATION.md`.
 - **Terms of Use** (`docs/terms.html`), including no tolerance for objectionable content. The sign-in sheet now says that continuing means agreeing to the Terms and Privacy Policy, and Settings → About links to the Terms.
 
+- **Deleting an account now revokes Sign in with Apple** (App Store Guideline 5.1.1(v)). Apple users confirm with Apple during deletion, and the `delete-account` edge function revokes the app's Apple tokens before removing the account. BookHoarder then disappears from the user's Apple ID "Sign in with Apple" list. Cancelling the Apple prompt cancels the deletion. If revocation fails, the account is still deleted and the failure is logged.
+
 ### Changed
 - The Claude API key note in Settings no longer says the key "never leaves your phone". It is sent to Anthropic with each Claude request.
 

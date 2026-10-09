@@ -121,7 +121,7 @@ export default function SettingsScreen() {
   function handleDeleteAccount() {
     Alert.alert(
       'Delete Account',
-      'This permanently deletes your account and all cloud data: shared shelves, library cards, ratings, and book requests. Books in your local library stay on this device.\n\nThis cannot be undone.',
+      'This permanently deletes your account and all cloud data: shared shelves, library cards, ratings, and book requests. Books in your local library stay on this device.\n\nIf you signed in with Apple, you\'ll be asked to confirm with Apple so BookHoarder\'s access to your Apple ID is revoked too.\n\nThis cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -133,6 +133,8 @@ export default function SettingsScreen() {
               await deleteAccount();
               Alert.alert('Account Deleted', 'Your account and cloud data have been removed.');
             } catch (e: any) {
+              // Backing out of the Apple confirmation just cancels the deletion
+              if (e.code === 'ERR_REQUEST_CANCELED') return;
               Alert.alert('Delete Failed', e.message ?? 'Could not delete your account. Please try again.');
             } finally {
               setDeletingAccount(false);
