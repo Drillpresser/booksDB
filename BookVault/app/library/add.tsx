@@ -15,7 +15,7 @@ import { insertBookRecord, insertBookCopy, saveCoverImage, deleteCoverImage, get
 import { generateId, getDB } from '../../src/database/db';
 import { getAllMainClasses, getSectionsByMainClass, getDivisionsBySection } from '../../src/database/queries/classifications';
 import { RFFC_SUFFIXES, RFFC_TAGS } from '../../src/data/rffcClassifications';
-import { getMyLibraries, syncBookToLibraries } from '../../src/services/library';
+import { getMyLibraries, syncBookToLibraries, resolveShelfCover } from '../../src/services/library';
 import { contributeCommunityBook } from '../../src/services/communityCatalog';
 import type { Library } from '../../src/services/library';
 import type { BookLookupResult, MainClass, Section, Division } from '../../src/types';
@@ -52,6 +52,11 @@ export default function AddBookScreen() {
   // Set when any form data came from Claude's training knowledge rather than a
   // real catalog — such guesses are never published to the community catalog.
   const aiSourced = useRef(false);
+  // Fields the user typed themselves. An ISBN lookup fills in everything else
+  // but never overwrites these, so typing details first and the ISBN last is safe.
+  const edited = useRef(new Set<keyof BookLookupResult>());
+  // The ISBN whose lookup is on screen, so leaving the field doesn't refetch it.
+  const lastLookupIsbn = useRef('');
 
   const [mainClasses, setMainClasses] = useState<MainClass[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
@@ -59,6 +64,10 @@ export default function AddBookScreen() {
   const [selectedMainClass, setSelectedMainClass] = useState<MainClass | null>(null);
   const [selectedSection, setSelectedSection] = useState<Section | null>(null);
   const [selectedDivision, setSelectedDivision] = useState<Division | null>(null);
+  // In-progress picker choices; committed only when a division is picked, so
+  // closing the picker halfway leaves the current classification untouched.
+  const [pickerMC, setPickerMC] = useState<MainClass | null>(null);
+  const [pickerSec, setPickerSec] = useState<Section | null>(null);
   const [classPickerLevel, setClassPickerLevel] = useState<'main' | 'section' | 'division'>('main');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<BookLookupResult[]>([]);
@@ -87,7 +96,22 @@ export default function AddBookScreen() {
     }
   }
 
+  function setField<K extends keyof BookLookupResult>(key: K, value: BookLookupResult[K]) {
+    edited.current.add(key);
+    setFormData((p) => ({ ...p, [key]: value }));
+  }
+
+  // Only the fields the user typed — what's left when a lookup finds nothing.
+  function keepEdited(prev: Partial<BookLookupResult>): Partial<BookLookupResult> {
+    const kept: Partial<BookLookupResult> = {};
+    for (const key of edited.current) (kept as any)[key] = prev[key];
+    return kept;
+  }
+
   function handleSearchResultSelect(result: BookLookupResult) {
+    // Picking a result starts a new book
+    edited.current.clear();
+    lastLookupIsbn.current = '';
     setFormData({ ...result });
     aiSourced.current = false;
     const isbn = result.isbn13 ? normalizeIsbn(result.isbn13) : '';
@@ -100,20 +124,29 @@ export default function AddBookScreen() {
   // `picked` is a search result the user already chose: the full ISBN lookup
   // enriches it, but must never replace it with nothing if the lookup fails.
   async function handleIsbnLookup(isbn: string, picked?: BookLookupResult) {
-    if (!isbn.trim()) return;
+    const clean = normalizeIsbn(isbn);
+    if (!clean || clean === lastLookupIsbn.current) return;
     setLoading(true);
     aiSourced.current = false;
     try {
-      let result = await lookupByIsbn(isbn.trim());
+      let result = await lookupByIsbn(clean);
       if (!result) {
         const hasKey = await getApiKey();
         if (hasKey) {
-          result = await lookupBookWithClaude(isbn.trim());
+          result = await lookupBookWithClaude(clean);
           aiSourced.current = !!result;
         }
       }
       if (result) {
-        setFormData(picked ? fillGaps(result, picked) : { ...result });
+        lastLookupIsbn.current = clean;
+        const found = result;
+        setFormData((prev) => {
+          const merged: Partial<BookLookupResult> = picked ? fillGaps(found, picked) : { ...found };
+          for (const key of edited.current) {
+            if (!isEmpty(prev[key])) (merged as any)[key] = prev[key];
+          }
+          return merged;
+        });
         if (result.language === 'non-en') {
           Alert.alert(
             'Non-English Edition',
@@ -123,13 +156,15 @@ export default function AddBookScreen() {
           Alert.alert('Not Found', 'No data found for this ISBN. You can fill in the details manually.');
         }
       } else if (!picked) {
+        // Drop details from any earlier lookup (a different book), keep what was typed
+        lastLookupIsbn.current = '';
+        setFormData(keepEdited);
         Alert.alert('Not Found', 'Could not find this book. Fill in the details manually.');
-        setFormData({});
       }
     } catch {
+      lastLookupIsbn.current = '';
       if (!picked) {
         Alert.alert('Lookup Failed', 'Could not look up this ISBN. Enter details manually.');
-        setFormData({});
       }
     } finally {
       setLoading(false);
@@ -142,15 +177,22 @@ export default function AddBookScreen() {
       Alert.alert('No API Key', 'Add your Anthropic API key in Settings to use Claude.');
       return;
     }
+    const isbn = normalizeIsbn(isbnInput) || null;
+    if (!formData.title?.trim() && !isbn) {
+      Alert.alert('Title or ISBN Needed', 'Enter a title or ISBN so Claude knows which book this is.');
+      return;
+    }
     setLoading(true);
     try {
-      const filled = await fillMissingFields(formData);
-      if (filled) {
+      const filled = await fillMissingFields(formData, isbn);
+      if (Object.keys(filled).length) {
         setFormData((prev) => ({ ...prev, ...filled }));
         aiSourced.current = true;
+      } else {
+        Alert.alert('Nothing Added', 'Either nothing is missing, or Claude isn\'t confident about the missing details for this book.');
       }
-    } catch {
-      Alert.alert('Error', 'Claude could not fill in the fields. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Claude Error', e?.message ?? 'Claude could not fill in the fields. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -174,20 +216,39 @@ export default function AddBookScreen() {
         { title: formData.title ?? '', authors: formData.authors ?? [], synopsis: formData.synopsis ?? null, deweyDecimal: formData.deweyDecimal ?? null },
         { mainClasses, sections: allSections, divisions: allDivisions }
       );
+      const sec = allSections.find((s) => s.id === suggestion.sectionId) ?? null;
+      const mc = mainClasses.find((m) => m.id === suggestion.mainClassId) ?? null;
       if (suggestion.divisionId) {
         const div = allDivisions.find((d) => d.id === suggestion.divisionId) ?? null;
-        const sec = div ? allSections.find((s) => s.id === div.sectionId) ?? null : null;
-        const mc = sec ? mainClasses.find((m) => m.id === sec.mainClassId) ?? null : null;
         setSelectedDivision(div);
         setSelectedSection(sec);
         setSelectedMainClass(mc);
         setSelectedDivisionId(suggestion.divisionId);
+      } else if (sec && mc) {
+        // A copy is filed under a division, so let the user finish Claude's choice
+        setPickerMC(mc);
+        setPickerSec(sec);
+        setDivisions(getDivisionsBySection(sec.id));
+        setClassPickerLevel('division');
+        Alert.alert('Choose a Division', `Claude suggests ${sec.code} ${sec.name} but couldn't pick a specific division. Choose one.`, [
+          { text: 'OK', onPress: () => setClassPickerVisible(true) },
+        ]);
+      } else if (mc) {
+        setPickerMC(mc);
+        setPickerSec(null);
+        setSections(getSectionsByMainClass(mc.id));
+        setClassPickerLevel('section');
+        Alert.alert('Choose a Section', `Claude suggests ${mc.code} ${mc.name} but couldn't narrow it down further. Choose a section and division.`, [
+          { text: 'OK', onPress: () => setClassPickerVisible(true) },
+        ]);
+      } else if (!suggestion.suffix && suggestion.tags.length === 0) {
+        Alert.alert('No Suggestion', 'Claude couldn\'t find a classification that fits this book.');
       }
       if (suggestion.suffix) setSelectedSuffix(suggestion.suffix);
       if (suggestion.tags.length > 0) setSelectedTags(suggestion.tags);
       if (suggestion.suffix || suggestion.tags.length > 0) setLevel4Expanded(true);
-    } catch {
-      Alert.alert('Error', 'Could not get a classification suggestion. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Claude Error', e?.message ?? 'Could not get a classification suggestion. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -285,29 +346,59 @@ export default function AddBookScreen() {
       }
 
       if (selectedLibraryIds.length > 0 && newCopyId) {
-        const authors = formData.authors ?? [];
-        syncBookToLibraries(selectedLibraryIds, {
-          copyId: newCopyId,
-          recordId: savedRecordId,
-          title: formData.title!,
-          authors,
-          sortAuthor: deriveSortAuthor(authors),
-          isbn13: isbn,
-          publisher: formData.publisher ?? null,
-          publishedYear: formData.publishedYear ?? null,
-          pageCount: formData.pageCount ?? null,
-          synopsis: formData.synopsis ?? null,
-          coverImage: formData.coverUrl ? formData.coverUrl.replace(/^http:\/\//i, 'https://') : null,
-          deweyDecimal: formData.deweyDecimal ?? null,
-          copyNumber: savedCopyNumber,
-          divisionCode: selectedDivision?.code ?? null,
-          divisionName: selectedDivision?.name ?? null,
-          sectionCode: selectedSection?.code ?? null,
-          sectionName: selectedSection?.name ?? null,
-          mainClassCode: selectedMainClass?.code ?? null,
-          mainClassName: selectedMainClass?.name ?? null,
-          isOnLoan: false,
-        }).catch(() => {});
+        // When the ISBN was already in the library, the existing record is what got saved
+        const saved = existingRecord
+          ? {
+              title: existingRecord.title, authors: existingRecord.authors, publisher: existingRecord.publisher,
+              publishedYear: existingRecord.publishedYear, pageCount: existingRecord.pageCount,
+              synopsis: existingRecord.synopsis, deweyDecimal: existingRecord.deweyDecimal,
+              cover: existingRecord.coverImage,
+            }
+          : {
+              title: formData.title!, authors: formData.authors ?? [], publisher: formData.publisher ?? null,
+              publishedYear: formData.publishedYear ?? null, pageCount: formData.pageCount ?? null,
+              synopsis: formData.synopsis ?? null, deweyDecimal: formData.deweyDecimal ?? null,
+              cover: formData.coverUrl ?? null,
+            };
+        const libraryIds = selectedLibraryIds;
+        const copyId = newCopyId;
+        (async () => {
+          const coverImage = await resolveShelfCover(saved.cover, isbn);
+          await syncBookToLibraries(libraryIds, {
+            copyId,
+            recordId: savedRecordId,
+            title: saved.title,
+            authors: saved.authors,
+            sortAuthor: deriveSortAuthor(saved.authors),
+            isbn13: isbn,
+            publisher: saved.publisher,
+            publishedYear: saved.publishedYear,
+            pageCount: saved.pageCount,
+            synopsis: saved.synopsis,
+            coverImage,
+            deweyDecimal: saved.deweyDecimal,
+            copyNumber: savedCopyNumber,
+            divisionCode: selectedDivision?.code ?? null,
+            divisionName: selectedDivision?.name ?? null,
+            sectionCode: selectedSection?.code ?? null,
+            sectionName: selectedSection?.name ?? null,
+            mainClassCode: selectedMainClass?.code ?? null,
+            mainClassName: selectedMainClass?.name ?? null,
+            isOnLoan: false,
+          });
+        })().catch(() => {
+          Alert.alert(
+            'Not Added to Shelves',
+            'The book was saved to your library, but it couldn\'t be added to your shelves. Check your connection, then add it from the book\'s page.',
+          );
+        });
+      }
+
+      if (existingRecord) {
+        Alert.alert(
+          'Added Another Copy',
+          `"${existingRecord.title}" is already in your library, so this was saved as copy ${savedCopyNumber}. To change the book's details, edit it from its page.`,
+        );
       }
 
       router.back();
@@ -498,16 +589,16 @@ export default function AddBookScreen() {
           placeholderTextColor={colors.textSecondary}
         />
 
-        <TextInput style={styles.input} placeholder="Title *" value={formData.title ?? ''} onChangeText={(v) => setFormData((p) => ({ ...p, title: v }))} placeholderTextColor={colors.textSecondary} />
-        <TextInput style={styles.input} placeholder="Author(s) — comma separated" value={(formData.authors ?? []).join(', ')} onChangeText={(v) => setFormData((p) => ({ ...p, authors: v.split(',').map((a) => a.trim()).filter(Boolean) }))} placeholderTextColor={colors.textSecondary} />
-        <TextInput style={styles.input} placeholder="Publisher" value={formData.publisher ?? ''} onChangeText={(v) => setFormData((p) => ({ ...p, publisher: v }))} placeholderTextColor={colors.textSecondary} />
-        <TextInput style={styles.input} placeholder="Year" value={formData.publishedYear?.toString() ?? ''} onChangeText={(v) => setFormData((p) => ({ ...p, publishedYear: parseInt(v) || null }))} keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
-        <TextInput style={styles.input} placeholder="Pages" value={formData.pageCount?.toString() ?? ''} onChangeText={(v) => setFormData((p) => ({ ...p, pageCount: parseInt(v) || null }))} keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
-        <TextInput style={[styles.input, { minHeight: 80 }]} placeholder="Synopsis" value={formData.synopsis ?? ''} onChangeText={(v) => setFormData((p) => ({ ...p, synopsis: v }))} multiline placeholderTextColor={colors.textSecondary} />
+        <TextInput style={styles.input} placeholder="Title *" value={formData.title ?? ''} onChangeText={(v) => setField('title', v)} placeholderTextColor={colors.textSecondary} />
+        <TextInput style={styles.input} placeholder="Author(s) — comma separated" value={(formData.authors ?? []).join(', ')} onChangeText={(v) => setField('authors', v.split(',').map((a) => a.trim()).filter(Boolean))} placeholderTextColor={colors.textSecondary} />
+        <TextInput style={styles.input} placeholder="Publisher" value={formData.publisher ?? ''} onChangeText={(v) => setField('publisher', v)} placeholderTextColor={colors.textSecondary} />
+        <TextInput style={styles.input} placeholder="Year" value={formData.publishedYear?.toString() ?? ''} onChangeText={(v) => setField('publishedYear', parseInt(v) || null)} keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
+        <TextInput style={styles.input} placeholder="Pages" value={formData.pageCount?.toString() ?? ''} onChangeText={(v) => setField('pageCount', parseInt(v) || null)} keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
+        <TextInput style={[styles.input, { minHeight: 80 }]} placeholder="Synopsis" value={formData.synopsis ?? ''} onChangeText={(v) => setField('synopsis', v)} multiline placeholderTextColor={colors.textSecondary} />
 
         <View style={styles.sectionLabel}><Text style={styles.sectionLabelText}>Classification</Text></View>
         <View style={styles.classRow}>
-          <TouchableOpacity style={styles.classPicker} onPress={() => { setClassPickerLevel('main'); setSections([]); setDivisions([]); setClassPickerVisible(true); }}>
+          <TouchableOpacity style={styles.classPicker} onPress={() => { setClassPickerLevel('main'); setPickerMC(null); setPickerSec(null); setSections([]); setDivisions([]); setClassPickerVisible(true); }}>
             <Text style={[styles.classPickerText, !selectedDivision && { color: colors.textSecondary }]} numberOfLines={2}>{classLabel}</Text>
             <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -625,6 +716,21 @@ export default function AddBookScreen() {
       <Modal visible={classPickerVisible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={styles.modalHeader}>
+            {classPickerLevel !== 'main' && (
+              <TouchableOpacity
+                onPress={() => {
+                  if (classPickerLevel === 'division') {
+                    if (pickerMC) setSections(getSectionsByMainClass(pickerMC.id));
+                    setClassPickerLevel('section');
+                  } else {
+                    setClassPickerLevel('main');
+                  }
+                }}
+                hitSlop={8}
+              >
+                <Ionicons name="chevron-back" size={22} color={colors.primary} />
+              </TouchableOpacity>
+            )}
             <Text style={styles.modalTitle}>
               {classPickerLevel === 'main' ? 'Main Class' : classPickerLevel === 'section' ? 'Section' : 'Division'}
             </Text>
@@ -637,7 +743,7 @@ export default function AddBookScreen() {
               data={mainClasses}
               keyExtractor={(m) => m.id}
               renderItem={({ item: mc }) => (
-                <TouchableOpacity style={styles.pickerRow} onPress={() => { setSelectedMainClass(mc); setSections(getSectionsByMainClass(mc.id)); setClassPickerLevel('section'); }}>
+                <TouchableOpacity style={styles.pickerRow} onPress={() => { setPickerMC(mc); setSections(getSectionsByMainClass(mc.id)); setClassPickerLevel('section'); }}>
                   <Text style={styles.pickerCode}>{mc.code}</Text>
                   <Text style={styles.pickerName}>{mc.name}</Text>
                   <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
@@ -650,7 +756,7 @@ export default function AddBookScreen() {
               data={sections}
               keyExtractor={(s) => s.id}
               renderItem={({ item: sec }) => (
-                <TouchableOpacity style={styles.pickerRow} onPress={() => { setSelectedSection(sec); setDivisions(getDivisionsBySection(sec.id)); setClassPickerLevel('division'); }}>
+                <TouchableOpacity style={styles.pickerRow} onPress={() => { setPickerSec(sec); setDivisions(getDivisionsBySection(sec.id)); setClassPickerLevel('division'); }}>
                   <Text style={styles.pickerCode}>{sec.code}</Text>
                   <Text style={styles.pickerName}>{sec.name}</Text>
                   <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
@@ -663,7 +769,13 @@ export default function AddBookScreen() {
               data={divisions}
               keyExtractor={(d) => d.id}
               renderItem={({ item: div }) => (
-                <TouchableOpacity style={styles.pickerRow} onPress={() => { setSelectedDivision(div); setSelectedDivisionId(div.id); setClassPickerVisible(false); }}>
+                <TouchableOpacity style={styles.pickerRow} onPress={() => {
+                  setSelectedMainClass(pickerMC);
+                  setSelectedSection(pickerSec);
+                  setSelectedDivision(div);
+                  setSelectedDivisionId(div.id);
+                  setClassPickerVisible(false);
+                }}>
                   <Text style={styles.pickerCode}>{div.code}</Text>
                   <Text style={styles.pickerName}>{div.name}</Text>
                 </TouchableOpacity>

@@ -8,11 +8,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fonts, spacing, radius } from '../../src/theme';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { getMyLibraries, getBooksInLibrary, createLibrary, getFollowedLibraries } from '../../src/services/library';
-import type { Library, LibraryBook, LibraryWithMeta } from '../../src/services/library';
+import { getMyLibraries, getBooksInLibrary, createLibrary, getFollowedLibraries, getMyRequests, getLibraryById } from '../../src/services/library';
+import type { Library, LibraryBook, LibraryWithMeta, BookRequest } from '../../src/services/library';
 
 type ShelfWithBooks = { library: Library; books: LibraryBook[] };
 type FollowedShelfWithBooks = { library: LibraryWithMeta; books: LibraryBook[] };
+
+const REQUEST_STATUS: Record<BookRequest['status'], { label: string; color: string }> = {
+  pending: { label: 'Waiting', color: colors.warning },
+  approved: { label: 'Approved', color: colors.success },
+  fulfilled: { label: 'Fulfilled', color: colors.success },
+  denied: { label: 'Declined', color: colors.danger },
+};
 
 const COVER_W = 67;
 const COVER_H = 98;
@@ -50,6 +57,7 @@ export default function MyShelvesScreen() {
   const { user } = useAuth();
   const [shelves, setShelves] = useState<ShelfWithBooks[]>([]);
   const [followedShelves, setFollowedShelves] = useState<FollowedShelfWithBooks[]>([]);
+  const [myRequests, setMyRequests] = useState<{ request: BookRequest; shelfName: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [createVisible, setCreateVisible] = useState(false);
   const [newName, setNewName] = useState('');
@@ -74,9 +82,18 @@ export default function MyShelvesScreen() {
       ]);
       setShelves(libs.map((lib, i) => ({ library: lib, books: myBooks[i] })));
       setFollowedShelves(followed.map((lib, i) => ({ library: lib, books: followedBooks[i] })));
+
+      // Requests I've sent to other people's shelves, so I can see how they went
+      const requests = await getMyRequests();
+      const names = new Map(followed.map((l) => [l.id, l.name] as [string, string]));
+      const unknown = [...new Set(requests.map((r) => r.libraryId).filter((id) => !names.has(id)))];
+      const looked = await Promise.all(unknown.map((id) => getLibraryById(id).catch(() => null)));
+      looked.forEach((l, i) => { if (l) names.set(unknown[i], l.name); });
+      setMyRequests(requests.map((r) => ({ request: r, shelfName: names.get(r.libraryId) ?? 'A shelf' })));
     } catch {
       setShelves([]);
       setFollowedShelves([]);
+      setMyRequests([]);
     } finally {
       setLoading(false);
     }
@@ -129,7 +146,7 @@ export default function MyShelvesScreen() {
 
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={colors.primary} size="large" /></View>
-      ) : shelves.length === 0 && followedShelves.length === 0 ? (
+      ) : shelves.length === 0 && followedShelves.length === 0 && myRequests.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="library-outline" size={64} color={colors.border} />
           <Text style={styles.emptyTitle}>No shelves yet</Text>
@@ -229,6 +246,36 @@ export default function MyShelvesScreen() {
               ))}
             </>
           )}
+
+          {myRequests.length > 0 && (
+            <>
+              <View style={[styles.sectionDivider, { marginTop: spacing.sm }]}>
+                <Text style={styles.sectionDividerLabel}>My Requests</Text>
+                <View style={styles.sectionDividerLine} />
+              </View>
+              {myRequests.map(({ request: r, shelfName }) => {
+                const status = REQUEST_STATUS[r.status] ?? REQUEST_STATUS.pending;
+                return (
+                  <TouchableOpacity
+                    key={r.id}
+                    style={styles.requestRow}
+                    onPress={() => router.push(`/library/view/${r.libraryId}`)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.requestTitle} numberOfLines={1}>{r.bookTitle}</Text>
+                      <Text style={styles.shelfMeta} numberOfLines={1}>
+                        {r.type === 'checkout' ? 'Borrow' : 'Hold'} · {shelfName}
+                      </Text>
+                    </View>
+                    <View style={[styles.requestPill, { borderColor: status.color }]}>
+                      <Text style={[styles.requestPillText, { color: status.color }]}>{status.label}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </>
+          )}
         </ScrollView>
       )}
 
@@ -308,6 +355,10 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: spacing.xl },
 
   shelfSection: { marginBottom: spacing.lg },
+  requestRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, marginBottom: spacing.sm, padding: spacing.md, backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+  requestTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
+  requestPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
+  requestPillText: { fontSize: 12, fontWeight: '600' },
   shelfHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   sectionDivider: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: spacing.md, paddingTop: 11, paddingBottom: 4 },
   sectionDividerLabel: { fontFamily: fonts.mono, fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.primaryDark },

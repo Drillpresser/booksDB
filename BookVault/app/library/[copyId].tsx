@@ -27,7 +27,9 @@ import type { HoldWithContact } from '../../src/database/queries/holds';
 import {
   updateBookLoanStatus, getMyLibraries, getLibraryIdsForCopy,
   upsertBookInLibrary, removeBookFromLibrary, removeBookFromAllLibraries,
+  resolveShelfCover, updateRecordOnShelves,
 } from '../../src/services/library';
+import { alertShelfSyncFailed } from '../../src/components/shelfAlerts';
 import type { Library } from '../../src/services/library';
 import type { BookCopyWithDetails, LoanWithDetails, Contact, MainClass, Section, Division } from '../../src/types';
 import { formatDate, toDateKey } from '../../src/lib/dates';
@@ -109,10 +111,11 @@ export default function BookDetailScreen() {
     try {
       await removeBookFromAllLibraries(copyId!);
     } catch {
-      // no-op if not on any shelves
-    } finally {
       setRemoving(false);
+      Alert.alert('Not Removed', 'Could not remove this book from your shelves. Check your connection and try again.');
+      return;
     }
+    setRemoving(false);
     router.back();
   }
 
@@ -253,35 +256,37 @@ export default function BookDetailScreen() {
         .catch(() => {});
     }
 
-    if (memberLibraryIds.length > 0) {
-      const isbn = updatedRecord.isbn13;
-      const shelfCover = isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg` : null;
-      memberLibraryIds.forEach((libId) => {
-        upsertBookInLibrary(libId, {
-          copyId: book.id,
-          recordId: updatedRecord.id,
-          title,
-          authors,
-          sortAuthor,
-          isbn13: isbn,
-          publisher,
-          publishedYear,
-          pageCount,
-          synopsis,
-          coverImage: shelfCover,
-          deweyDecimal: updatedRecord.deweyDecimal,
-          copyNumber: book.copyNumber,
-          divisionCode: editDivision?.code ?? null,
-          divisionName: editDivision?.name ?? null,
-          sectionCode: editSection?.code ?? null,
-          sectionName: editSection?.name ?? null,
-          mainClassCode: editMainClass?.code ?? null,
-          mainClassName: editMainClass?.name ?? null,
-          isOnLoan: book.isOnLoan,
-        }).catch(() => {});
+    // Record fields go to the shelf entries of every copy of this book; the
+    // classification belongs to this copy only.
+    const shelfIds = memberLibraryIds;
+    (async () => {
+      const shelfCover = await resolveShelfCover(coverImage, updatedRecord.isbn13);
+      await updateRecordOnShelves(updatedRecord.id, {
+        title, authors, sortAuthor, publisher, publishedYear, pageCount, synopsis, coverImage: shelfCover,
       });
-    }
-
+      await Promise.all(shelfIds.map((libId) => upsertBookInLibrary(libId, {
+        copyId: book.id,
+        recordId: updatedRecord.id,
+        title,
+        authors,
+        sortAuthor,
+        isbn13: updatedRecord.isbn13,
+        publisher,
+        publishedYear,
+        pageCount,
+        synopsis,
+        coverImage: shelfCover,
+        deweyDecimal: updatedRecord.deweyDecimal,
+        copyNumber: book.copyNumber,
+        divisionCode: editDivision?.code ?? null,
+        divisionName: editDivision?.name ?? null,
+        sectionCode: editSection?.code ?? null,
+        sectionName: editSection?.name ?? null,
+        mainClassCode: editMainClass?.code ?? null,
+        mainClassName: editMainClass?.name ?? null,
+        isOnLoan: book.isOnLoan,
+      })));
+    })().catch(alertShelfSyncFailed);
     setSavingEdit(false);
     setEditVisible(false);
   }
@@ -312,23 +317,45 @@ export default function BookDetailScreen() {
         { title: book.record.title, authors: book.record.authors, synopsis: book.record.synopsis, deweyDecimal: book.record.deweyDecimal },
         { mainClasses: allMC, sections: allSec, divisions: allDiv }
       );
+      const sec = allSec.find((s) => s.id === suggestion.sectionId) ?? null;
+      const mc = allMC.find((m) => m.id === suggestion.mainClassId) ?? null;
       if (suggestion.divisionId) {
         const div = allDiv.find((d) => d.id === suggestion.divisionId) ?? null;
-        const sec = div ? allSec.find((s) => s.id === div.sectionId) ?? null : null;
-        const mc = sec ? allMC.find((m) => m.id === sec.mainClassId) ?? null : null;
         if (div && sec && mc) {
           setEditDivision(div);
           setEditSection(sec);
           setEditMainClass(mc);
         }
+      } else if (sec && mc) {
+        // A copy is filed under a division, so let the user finish Claude's choice
+        setClassPickerMCs(allMC);
+        setClassPickerMC(mc);
+        setClassPickerSecs(getSectionsByMainClass(mc.id));
+        setClassPickerSec(sec);
+        setClassPickerDivs(getDivisionsBySection(sec.id));
+        setClassPickerLevel('division');
+        Alert.alert('Choose a Division', `Claude suggests ${sec.code} ${sec.name} but couldn't pick a specific division. Choose one.`, [
+          { text: 'OK', onPress: () => setClassPickerVisible(true) },
+        ]);
+      } else if (mc) {
+        setClassPickerMCs(allMC);
+        setClassPickerMC(mc);
+        setClassPickerSecs(getSectionsByMainClass(mc.id));
+        setClassPickerSec(null);
+        setClassPickerLevel('section');
+        Alert.alert('Choose a Section', `Claude suggests ${mc.code} ${mc.name} but couldn't narrow it down further. Choose a section and division.`, [
+          { text: 'OK', onPress: () => setClassPickerVisible(true) },
+        ]);
+      } else if (suggestion.suffix === null && suggestion.tags.length === 0) {
+        Alert.alert('No Suggestion', 'Claude couldn\'t find a classification that fits this book.');
       }
       if (suggestion.suffix !== null) setEditSuffix(suggestion.suffix);
       if (suggestion.tags.length > 0) {
         setEditTags(suggestion.tags);
         setLevel4Expanded(true);
       }
-    } catch {
-      Alert.alert('Error', 'Could not get a classification suggestion. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Claude Error', e?.message ?? 'Could not get a classification suggestion. Please try again.');
     } finally {
       setClassifying(false);
     }
@@ -350,7 +377,7 @@ export default function BookDetailScreen() {
         onPress: () => {
           returnLoan(book.currentLoan!.id, new Date().toISOString());
           loadData();
-          updateBookLoanStatus(book.id, false).catch(() => {});
+          if (memberLibraryIds.length) updateBookLoanStatus(book.id, false).catch(alertShelfSyncFailed);
         },
       },
     ]);
@@ -391,43 +418,47 @@ export default function BookDetailScreen() {
     }
     setLendModalVisible(false);
     loadData();
-    updateBookLoanStatus(book.id, true).catch(() => {});
+    if (memberLibraryIds.length) updateBookLoanStatus(book.id, true).catch(alertShelfSyncFailed);
   }
 
   async function handleLibraryToggle(lib: Library) {
     if (!book) return;
     const inLibrary = memberLibraryIds.includes(lib.id);
-    if (inLibrary) {
-      await removeBookFromLibrary(lib.id, book.id).catch(() => {});
-      setMemberLibraryIds((prev) => prev.filter((id) => id !== lib.id));
-    } else {
-      const isbn = book.record.isbn13;
-      const coverImage = isbn
-        ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`
-        : null;
-      await upsertBookInLibrary(lib.id, {
-        copyId: book.id,
-        recordId: book.record.id,
-        title: book.record.title,
-        authors: book.record.authors,
-        sortAuthor: book.record.sortAuthor,
-        isbn13: isbn,
-        publisher: book.record.publisher,
-        publishedYear: book.record.publishedYear,
-        pageCount: book.record.pageCount,
-        synopsis: book.record.synopsis,
-        coverImage,
-        deweyDecimal: book.record.deweyDecimal,
-        copyNumber: book.copyNumber,
-        divisionCode: book.division?.code ?? null,
-        divisionName: book.division?.name ?? null,
-        sectionCode: book.section?.code ?? null,
-        sectionName: book.section?.name ?? null,
-        mainClassCode: book.mainClass?.code ?? null,
-        mainClassName: book.mainClass?.name ?? null,
-        isOnLoan: book.isOnLoan,
-      }).catch(() => {});
-      setMemberLibraryIds((prev) => [...prev, lib.id]);
+    try {
+      if (inLibrary) {
+        await removeBookFromLibrary(lib.id, book.id);
+        setMemberLibraryIds((prev) => prev.filter((id) => id !== lib.id));
+      } else {
+        const isbn = book.record.isbn13;
+        await upsertBookInLibrary(lib.id, {
+          copyId: book.id,
+          recordId: book.record.id,
+          title: book.record.title,
+          authors: book.record.authors,
+          sortAuthor: book.record.sortAuthor,
+          isbn13: isbn,
+          publisher: book.record.publisher,
+          publishedYear: book.record.publishedYear,
+          pageCount: book.record.pageCount,
+          synopsis: book.record.synopsis,
+          coverImage: await resolveShelfCover(book.record.coverImage, isbn),
+          deweyDecimal: book.record.deweyDecimal,
+          copyNumber: book.copyNumber,
+          divisionCode: book.division?.code ?? null,
+          divisionName: book.division?.name ?? null,
+          sectionCode: book.section?.code ?? null,
+          sectionName: book.section?.name ?? null,
+          mainClassCode: book.mainClass?.code ?? null,
+          mainClassName: book.mainClass?.name ?? null,
+          isOnLoan: book.isOnLoan,
+        });
+        setMemberLibraryIds((prev) => [...prev, lib.id]);
+      }
+    } catch {
+      Alert.alert(
+        inLibrary ? 'Not Removed' : 'Not Added',
+        `Could not ${inLibrary ? 'remove this book from' : 'add this book to'} "${lib.name}". Check your connection and try again.`,
+      );
     }
   }
 
@@ -459,7 +490,8 @@ export default function BookDetailScreen() {
   function performDelete(removeFromShelves: boolean) {
     if (!book) return;
     try {
-      deleteBookCopy(book.id);
+      const orphanedCover = deleteBookCopy(book.id);
+      if (orphanedCover) deleteCoverImage(orphanedCover).catch(() => {});
     } catch {
       Alert.alert('Error', 'Could not delete this copy. Please try again.');
       return;

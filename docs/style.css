@@ -36,3 +36,4 @@ table { width: 100%; border-collapse: collapse; font-size: 15px; display: block;
 th, td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid var(--rule); }
 th { color: var(--muted); font-weight: 600; }
 .footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--rule); font-size: 15px; }
+.button { display: inline-block; background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; padding: 12px 22px; border-radius: 10px; }

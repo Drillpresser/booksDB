@@ -37,19 +37,18 @@ export function createContact(data: Omit<Contact, 'id' | 'createdAt'>): string {
 }
 
 export function updateContact(id: string, data: Partial<Omit<Contact, 'id'>>) {
-  const db = getDB();
-  const fields: [string, any][] = [
+  const set = ([
     ['name', data.name],
     ['phone', data.phone],
     ['email', data.email],
     ['notes', data.notes],
     ['color', data.color],
-  ];
-  for (const [col, val] of fields) {
-    if (val !== undefined) {
-      db.runSync(`UPDATE contacts SET ${col} = ? WHERE id = ?`, [val, id]);
-    }
-  }
+  ] as [string, unknown][]).filter(([, v]) => v !== undefined);
+  if (!set.length) return;
+  getDB().runSync(
+    `UPDATE contacts SET ${set.map(([c]) => `${c} = ?`).join(', ')} WHERE id = ?`,
+    [...set.map(([, v]) => v as any), id],
+  );
 }
 
 export function deleteContact(id: string) {

@@ -16,8 +16,28 @@ Notable changes to BookHoarder. Versions correspond to iOS build numbers on Test
 
 - **Deleting an account now revokes Sign in with Apple** (App Store Guideline 5.1.1(v)). Apple users confirm with Apple during deletion, and the `delete-account` edge function revokes the app's Apple tokens before removing the account. BookHoarder then disappears from the user's Apple ID "Sign in with Apple" list. Cancelling the Apple prompt cancels the deletion. If revocation fails, the account is still deleted and the failure is logged.
 
+- **Back up and restore your library.** Settings → **Back Up Library** saves a file with every book, copy, classification, format/tag, note, rating, patron, loan and waitlist entry. **Restore from Backup** merges a backup into the library. Restoring the same file twice adds nothing, and books whose ISBN you already have are kept as they are. Covers you saved on the device aren't included, but web covers are. This adds the `expo-document-picker` native module, so it needs a new build.
+- **My Requests** on the Shelves tab shows the borrow and hold requests you've sent to other people's shelves and whether each is waiting, fulfilled or declined.
+- **Fulfilling a shelf request records it.** For a borrow request, **Fulfill** lends the book to the requester (shown in the Lending tab, with the shelf showing it as out). For a hold request, or a borrow request for a book that's already out, the requester joins the book's waitlist. The requester becomes a patron, matched by name to an existing patron when there is one.
+
 ### Changed
 - The Claude API key note in Settings no longer says the key "never leaves your phone". It is sent to Anthropic with each Claude request.
+- **Invite links are web links now** (`…/booksDB/invite.html#token`), and the page opens the app. `bookvault://` links often weren't tappable in messaging apps and did nothing without the app installed. The token stays in the URL fragment, so it's never sent to a server.
+- **The API key is checked when saved.** A key Anthropic rejects isn't saved, and Claude failures now say why (bad key, busy, offline) instead of doing nothing.
+- **Claude only fills in facts.** "Ask Claude to fill missing fields" no longer asks for cover URLs or ratings, which it could only make up. It now works on manual entries too (it previously did nothing unless a lookup had already run), and it tells you when it has nothing to add.
+- **Partial classification suggestions are kept.** When Claude can only suggest a section or main class, the picker opens at that level so you can choose the division. Previously the suggestion was silently dropped.
+- **Library search** also matches tags, notes and classification codes and names. Author search no longer matches every book when the search contains a quote mark.
+- **Lending tab** shows book covers.
+- **Shelf covers are consistent.** Every path that puts a book on a shelf uses the looked-up cover, then the shared catalog's cover, then Open Library's.
+- Adding a book whose ISBN is already in your library now tells you it was saved as another copy of the existing book.
+
+### Fixed
+- **Shelf changes reported success when they failed.** Shelf writes ignored Supabase's errors, so going offline (or any server refusal) still showed "Saved", turned a shelf chip on, removed a book from the list or left a deleted shelf in place. Failures now show an alert and the screen stays as it was. Local changes such as loans and edits are still saved first. You're told when the shelf copy couldn't be updated.
+- **Add Book classification picker** could save a mismatched main class / section / division if you closed it partway through a new choice. The picker now commits only when you pick a division, and it has a back button.
+- **Add Book lost typed details.** Leaving the ISBN field replaced everything you'd typed with the lookup result, or cleared the form if nothing was found. Typed fields are now kept, and the lookup fills in the rest. Leaving the field without changing the ISBN no longer looks it up again.
+- **Editing a book** now updates the shelf entries of every copy of that book, not just the one you edited.
+- **Deleting the last copy of a book** now also deletes its saved cover image file.
+- Book and patron updates now run as a single SQL statement instead of one per field.
 
 ### Security (Supabase)
 - **Re-closed shelf privilege-escalation holes** (`20261006000000_reharden_shelf_policies.sql`) — the repo's original shelf migrations still held the pre-July policies, and CI's first `supabase db push` (2026-08-08) re-created them next to the hardened ones. From then until this fix, unclaimed invite tokens were readable (even signed out), any signed-in user could claim an invite card without its token, and applicants/requesters could approve their own cards and requests. The migration drops those policies and restores owner-only updates with no direct access to invite rows (invites go through `get_invite` / `claim_invite`). Verified against the vulnerable state: 6 exploits reproduced before, all blocked after, owner/cardholder flows unaffected.
