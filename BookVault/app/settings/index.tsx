@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, TextInput,
-  Alert, ScrollView, Share,
+  Alert, ScrollView, Share, Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fonts, spacing, radius } from '../../src/theme';
-import { getApiKey, saveApiKey, deleteApiKey } from '../../src/services/claude';
+import { getApiKey, saveApiKey, deleteApiKey, testApiKey } from '../../src/services/claude';
 import { LIBRARY_SORT_OPTIONS, getLibrarySort, setLibrarySort } from '../../src/database/queries/preferences';
 import type { LibrarySortMode } from '../../src/database/queries/preferences';
-import { getAllCopies } from '../../src/database/queries/books';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { writeBackupFile, restoreBackupFile } from '../../src/services/backup';
 import { getDB } from '../../src/database/db';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { getPendingEditCount } from '../../src/services/communityCatalog';
@@ -42,12 +44,25 @@ export default function SettingsScreen() {
   }, []);
 
   async function handleSaveKey() {
-    if (!apiKey.trim()) return;
+    const key = apiKey.trim();
+    if (!key) return;
     setSaving(true);
     try {
-      await saveApiKey(apiKey.trim());
+      const check = await testApiKey(key);
+      if (check === 'invalid') {
+        Alert.alert('Key Rejected', "Anthropic didn't accept this API key. Check that you copied the whole key.");
+        return;
+      }
+      await saveApiKey(key);
       setHasKey(true);
-      Alert.alert('Saved', 'Your Anthropic API key has been saved securely.');
+      Alert.alert(
+        'Saved',
+        check === 'valid'
+          ? 'Your Anthropic API key works and has been saved securely.'
+          : "Your key has been saved, but it couldn't be checked because Anthropic wasn't reachable.",
+      );
+    } catch {
+      Alert.alert('Error', 'Could not save your API key.');
     } finally {
       setSaving(false);
     }
@@ -92,29 +107,38 @@ export default function SettingsScreen() {
 
   async function handleExport() {
     try {
-      const books = getAllCopies();
-      const payload = {
-        exportedAt: new Date().toISOString(),
-        volumeCount: books.length,
-        books: books.map((b) => ({
-          title: b.record.title,
-          authors: b.record.authors,
-          isbn13: b.record.isbn13,
-          publisher: b.record.publisher,
-          publishedYear: b.record.publishedYear,
-          pageCount: b.record.pageCount,
-          deweyDecimal: b.record.deweyDecimal,
-          personalRating: b.personalRating,
-          copyNumber: b.copyNumber,
-          notes: b.notes,
-          dateAdded: b.dateAdded,
-          isOnLoan: b.isOnLoan,
-        })),
-      };
-      const json = JSON.stringify(payload, null, 2);
-      await Share.share({ message: json, title: 'BookHoarder Library Export' });
+      const uri = await writeBackupFile();
+      if (Platform.OS === 'ios') {
+        await Share.share({ url: uri, title: 'BookHoarder Backup' });
+      } else {
+        await Share.share({ message: await FileSystem.readAsStringAsync(uri), title: 'BookHoarder Backup' });
+      }
     } catch {
       Alert.alert('Export Failed', 'Could not export your library.');
+    }
+  }
+
+  async function handleImport() {
+    try {
+      const pick = await DocumentPicker.getDocumentAsync({
+        type: ['application/json', 'text/plain'],
+        copyToCacheDirectory: true,
+      });
+      if (pick.canceled || !pick.assets?.[0]) return;
+      const r = await restoreBackupFile(pick.assets[0].uri);
+      const row = getDB().getFirstSync('SELECT COUNT(*) as cnt FROM book_copies') as any;
+      setVolumeCount(row?.cnt ?? 0);
+      const total = r.books + r.copies + r.contacts + r.loans + r.holds;
+      Alert.alert(
+        'Restore Complete',
+        total === 0
+          ? 'Everything in that backup is already in your library.'
+          : `Added ${r.copies} cop${r.copies === 1 ? 'y' : 'ies'} (${r.books} new book${r.books === 1 ? '' : 's'}), ` +
+            `${r.contacts} patron${r.contacts === 1 ? '' : 's'}, ${r.loans} loan${r.loans === 1 ? '' : 's'} ` +
+            `and ${r.holds} waitlist entr${r.holds === 1 ? 'y' : 'ies'}. Books already in your library were left as they are.`,
+      );
+    } catch (e: any) {
+      Alert.alert('Restore Failed', e?.message ?? 'Could not restore that backup.');
     }
   }
 
@@ -289,8 +313,13 @@ export default function SettingsScreen() {
           <Text style={styles.sectionTitle}>Data</Text>
           <TouchableOpacity style={styles.navRow} onPress={handleExport}>
             <Ionicons name="share-outline" size={22} color={colors.primary} />
-            <Text style={styles.navRowText}>Export Library</Text>
-            <Text style={styles.navRowValue}>{volumeCount} vols · JSON</Text>
+            <Text style={styles.navRowText}>Back Up Library</Text>
+            <Text style={styles.navRowValue}>{volumeCount} vols</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.navRow} onPress={handleImport}>
+            <Ionicons name="download-outline" size={22} color={colors.primary} />
+            <Text style={styles.navRowText}>Restore from Backup</Text>
             <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>

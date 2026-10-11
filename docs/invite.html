@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BookHoarder Invite</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <p class="app">BookHoarder</p>
+  <h1>You're invited to a shelf</h1>
+  <p id="lead">Someone shared one of their BookHoarder shelves with you.</p>
+  <p><a id="open" class="button" href="#">Open in BookHoarder</a></p>
+  <h2>Don't have the app?</h2>
+  <p>Install BookHoarder on your iPhone, then come back to this page and tap <strong>Open in BookHoarder</strong>. The invite works once and is tied to this link.</p>
+  <p class="footer"><a href="index.html">Support</a> · <a href="privacy.html">Privacy Policy</a> · <a href="terms.html">Terms of Use</a></p>
+</main>
+<script>
+  // The token travels in the URL fragment, which browsers never send to the server.
+  var token = (location.hash || '').slice(1);
+  var link = document.getElementById('open');
+  if (/^[0-9a-f]{64}$/.test(token)) {
+    var appUrl = 'bookvault://library/invite/' + token;
+    link.href = appUrl;
+    location.href = appUrl;
+  } else {
+    document.getElementById('lead').textContent = 'This invite link is incomplete. Ask the shelf owner to send it again.';
+    link.style.display = 'none';
+  }
+</script>
+</body>
+</html>

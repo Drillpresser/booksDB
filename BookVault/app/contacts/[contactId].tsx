@@ -12,6 +12,8 @@ import { getContactById, updateContact, deleteContact } from '../../src/database
 import { getLoanHistoryForContact, createLoan, returnLoan } from '../../src/database/queries/loans';
 import { getAllCopies } from '../../src/database/queries/books';
 import { getMyLibraries, createInvite, updateBookLoanStatus } from '../../src/services/library';
+import { alertShelfSyncFailed } from '../../src/components/shelfAlerts';
+import { inviteUrl } from '../../src/lib/links';
 import type { Library } from '../../src/services/library';
 import type { Contact, LoanWithDetails, BookCopyWithDetails } from '../../src/types';
 import { daysLate, daysSince, daysUntilDue, formatDate, toDateKey } from '../../src/lib/dates';
@@ -139,7 +141,7 @@ export default function ContactDetailScreen() {
     try {
       const returnIso = returnDate ? toDateKey(returnDate) : null;
       createLoan(selectedBook.id, contact.id, new Date().toISOString(), returnIso, lendNotes.trim() || null);
-      await updateBookLoanStatus(selectedBook.id, true).catch(() => {});
+      updateBookLoanStatus(selectedBook.id, true).catch(alertShelfSyncFailed);
       setLendVisible(false);
       loadData();
     } finally {
@@ -159,7 +161,7 @@ export default function ContactDetailScreen() {
           text: 'Returned',
           onPress: () => {
             returnLoan(loan.id, new Date().toISOString());
-            updateBookLoanStatus(loan.copyId, false).catch(() => {});
+            updateBookLoanStatus(loan.copyId, false).catch(alertShelfSyncFailed);
             loadData();
           },
         },
@@ -174,7 +176,7 @@ export default function ContactDetailScreen() {
     try {
       const inv = await createInvite(lib.id);
       if (!inv?.inviteToken) throw new Error();
-      const link = `bookvault://library/invite/${inv.inviteToken}`;
+      const link = inviteUrl(inv.inviteToken);
       await Share.share({
         message: `${contact?.name ?? 'You'} — you're invited to ${lib.name} on BookHoarder!\n\n${link}`,
         title: `Invite to ${lib.name}`,

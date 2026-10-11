@@ -235,13 +235,21 @@ export function insertBookCopy(data: Omit<BookCopy, 'id'>): string {
   return id;
 }
 
+// Builds one UPDATE from the fields that are present (undefined = leave as is).
+// Column names come from the fixed maps below, never from caller input.
+function updateColumns(table: string, id: string, pairs: [string, unknown][]) {
+  const set = pairs.filter(([, v]) => v !== undefined);
+  if (!set.length) return;
+  getDB().runSync(
+    `UPDATE ${table} SET ${set.map(([c]) => `${c} = ?`).join(', ')} WHERE id = ?`,
+    [...set.map(([, v]) => v as any), id],
+  );
+}
+
 export function updateBookRecord(id: string, data: Partial<Omit<BookRecord, 'id'>>) {
-  const db = getDB();
-  if (data.authors !== undefined) {
-    db.runSync('UPDATE book_records SET authors = ? WHERE id = ?', [JSON.stringify(data.authors), id]);
-  }
-  const fields: [string, any][] = [
+  updateColumns('book_records', id, [
     ['title', data.title],
+    ['authors', data.authors === undefined ? undefined : JSON.stringify(data.authors)],
     ['sort_author', data.sortAuthor],
     ['isbn13', data.isbn13],
     ['publisher', data.publisher],
@@ -253,46 +261,40 @@ export function updateBookRecord(id: string, data: Partial<Omit<BookRecord, 'id'
     ['community_rating', data.communityRating],
     ['community_rating_count', data.communityRatingCount],
     ['community_rating_fetched', data.communityRatingFetched],
-  ];
-  for (const [col, val] of fields) {
-    if (val !== undefined) {
-      db.runSync(`UPDATE book_records SET ${col} = ? WHERE id = ?`, [val, id]);
-    }
-  }
+  ]);
 }
 
 export function updateBookCopy(id: string, data: Partial<Pick<BookCopy, 'divisionId' | 'suffix' | 'tags' | 'personalRating' | 'notes'>>) {
-  const db = getDB();
-  if (data.divisionId !== undefined) {
-    db.runSync('UPDATE book_copies SET division_id = ? WHERE id = ?', [data.divisionId, id]);
-  }
-  if (data.suffix !== undefined) {
-    db.runSync('UPDATE book_copies SET suffix = ? WHERE id = ?', [data.suffix, id]);
-  }
-  if (data.tags !== undefined) {
-    db.runSync('UPDATE book_copies SET tags = ? WHERE id = ?', [JSON.stringify(data.tags), id]);
-  }
-  if (data.personalRating !== undefined) {
-    db.runSync('UPDATE book_copies SET personal_rating = ? WHERE id = ?', [data.personalRating, id]);
-  }
-  if (data.notes !== undefined) {
-    db.runSync('UPDATE book_copies SET notes = ? WHERE id = ?', [data.notes, id]);
-  }
+  updateColumns('book_copies', id, [
+    ['division_id', data.divisionId],
+    ['suffix', data.suffix],
+    ['tags', data.tags === undefined ? undefined : JSON.stringify(data.tags)],
+    ['personal_rating', data.personalRating],
+    ['notes', data.notes],
+  ]);
 }
 
-export function deleteBookCopy(copyId: string) {
+// Deletes a copy, and its book record once no copies remain. Returns the
+// record's stored cover path when the record went too, so the caller can
+// remove the cover file (file deletion is async and can't join the transaction).
+export function deleteBookCopy(copyId: string): string | null {
   const db = getDB();
-  const copy = db.getFirstSync('SELECT record_id FROM book_copies WHERE id = ?', [copyId]) as any;
-  db.runSync('DELETE FROM book_copies WHERE id = ?', [copyId]);
-  if (copy) {
+  let orphanedCover: string | null = null;
+  db.withTransactionSync(() => {
+    const copy = db.getFirstSync('SELECT record_id FROM book_copies WHERE id = ?', [copyId]) as any;
+    db.runSync('DELETE FROM book_copies WHERE id = ?', [copyId]);
+    if (!copy) return;
     const remaining = db.getFirstSync(
       'SELECT COUNT(*) as count FROM book_copies WHERE record_id = ?',
       [copy.record_id]
     ) as any;
     if (remaining?.count === 0) {
+      const rec = db.getFirstSync('SELECT cover_image FROM book_records WHERE id = ?', [copy.record_id]) as any;
+      orphanedCover = resolveCoverUri(rec?.cover_image ?? null);
       db.runSync('DELETE FROM book_records WHERE id = ?', [copy.record_id]);
     }
-  }
+  });
+  return orphanedCover;
 }
 
 export function getRecordCopySummary(recordId: string): { total: number; available: number } {
@@ -311,12 +313,17 @@ export function getRecordCopySummary(recordId: string): { total: number; availab
 
 export function searchCopies(query: string): BookCopyWithDetails[] {
   const db = getDB();
-  const like = `%${query}%`;
+  const like = `%${query.trim()}%`;
   const rows = db.getAllSync(
     `${COPY_DETAIL_QUERY}
-     WHERE br.title LIKE ? OR br.authors LIKE ? OR br.isbn13 LIKE ?
+     WHERE br.title LIKE ?
+        OR EXISTS (SELECT 1 FROM json_each(br.authors) WHERE json_each.value LIKE ?)
+        OR br.isbn13 LIKE ?
+        OR bc.notes LIKE ?
+        OR EXISTS (SELECT 1 FROM json_each(bc.tags) WHERE json_each.value LIKE ?)
+        OR d.code LIKE ? OR d.name LIKE ? OR s.name LIKE ? OR m.name LIKE ?
      ORDER BY br.sort_author, br.title`,
-    [like, like, like]
+    [like, like, like, like, like, `${query.trim()}%`, like, like, like]
   ) as any[];
   return rows.map(rowToDetail);
 }

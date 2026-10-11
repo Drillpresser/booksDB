@@ -14,6 +14,13 @@ import {
 } from '../../src/services/library';
 import type { Library, LibraryCard, BookRequest, LibraryBook } from '../../src/services/library';
 import { supabase } from '../../src/lib/supabase';
+import { inviteUrl } from '../../src/lib/links';
+import { getCopyById } from '../../src/database/queries/books';
+import { getAllContacts, createContact } from '../../src/database/queries/contacts';
+import { createLoan } from '../../src/database/queries/loans';
+import { addHold, isContactOnHold } from '../../src/database/queries/holds';
+import { updateBookLoanStatus } from '../../src/services/library';
+import { alertShelfSyncFailed } from '../../src/components/shelfAlerts';
 import { openModerationMenu } from '../../src/components/moderationMenu';
 import type { ReportContentType } from '../../src/services/moderation';
 
@@ -108,7 +115,7 @@ export default function ManageShelfScreen() {
     try {
       const inv = await createInvite(libraryId!);
       if (!inv?.inviteToken) throw new Error('No token');
-      const link = `bookvault://library/invite/${inv.inviteToken}`;
+      const link = inviteUrl(inv.inviteToken);
       await Share.share({
         message: `You're invited to ${library?.name ?? 'my shelf'} on BookHoarder!\n\n${link}`,
         title: `Join ${library?.name ?? 'my shelf'}`,
@@ -146,6 +153,48 @@ export default function ManageShelfScreen() {
           } catch {
             Alert.alert('Error', 'Could not remove the book from this shelf.');
           }
+        },
+      },
+    ]);
+  }
+
+  // Fulfilling a request also records it locally: a checkout becomes a loan in
+  // the Lending tab, a hold joins the book's waitlist. The requester becomes a
+  // patron (matched by name to an existing one when possible).
+  function handleFulfill(r: BookRequest) {
+    const copy = getCopyById(r.copyId);
+    if (!copy) {
+      Alert.alert('Book Not Found', `"${r.bookTitle}" is no longer in your library. You can deny the request instead.`);
+      return;
+    }
+    const name = r.requesterDisplayName?.trim() || 'Reader';
+    const lendNow = r.type === 'checkout' && !copy.isOnLoan;
+    const message = lendNow
+      ? `Lend "${copy.record.title}" to ${name}? This records the loan in your Lending tab.`
+      : r.type === 'checkout'
+        ? `"${copy.record.title}" is out on loan, so ${name} will be added to its waitlist instead.`
+        : `Add ${name} to the waitlist for "${copy.record.title}"?`;
+    Alert.alert('Fulfill Request', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: lendNow ? 'Lend' : 'Add to Waitlist',
+        onPress: async () => {
+          try {
+            await updateRequestStatus(r.id, 'fulfilled');
+          } catch {
+            Alert.alert('Error', 'Could not update the request. Check your connection and try again.');
+            return;
+          }
+          const existing = getAllContacts().find((c) => c.name.trim().toLowerCase() === name.toLowerCase());
+          const contactId = existing?.id
+            ?? createContact({ name, phone: null, email: null, notes: 'Added from a shelf request', color: null });
+          if (lendNow) {
+            createLoan(copy.id, contactId, new Date().toISOString(), null, r.notes);
+            updateBookLoanStatus(copy.id, true).catch(alertShelfSyncFailed);
+          } else if (!isContactOnHold(copy.recordId, contactId)) {
+            addHold(copy.recordId, contactId, r.notes);
+          }
+          await load();
         },
       },
     ]);
@@ -366,7 +415,7 @@ export default function ManageShelfScreen() {
                     />
                     <TouchableOpacity
                       style={styles.fulfillBtn}
-                      onPress={() => handleRequestAction(r.id, 'fulfilled')}
+                      onPress={() => handleFulfill(r)}
                     >
                       <Text style={styles.fulfillBtnText}>Fulfill</Text>
                     </TouchableOpacity>

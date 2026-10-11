@@ -1,5 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import { supabase } from '../lib/supabase';
+import { getCommunityBook } from './communityCatalog';
 
 // Invite tokens are shared credentials — use a CSPRNG, not Math.random()
 function generateInviteToken(): string {
@@ -143,8 +144,8 @@ export async function createLibrary(name: string, description: string | null, is
   const { data, error } = await supabase.from('libraries')
     .insert({ owner_id: user.id, name, description, is_public: isPublic })
     .select().single();
-  if (error || !data) return null;
-  return toLibrary(data);
+  if (error) throw error;
+  return data ? toLibrary(data) : null;
 }
 
 export async function updateLibrary(id: string, updates: { name?: string; description?: string | null; isPublic?: boolean }): Promise<void> {
@@ -152,11 +153,13 @@ export async function updateLibrary(id: string, updates: { name?: string; descri
   if (updates.name !== undefined) payload.name = updates.name;
   if (updates.description !== undefined) payload.description = updates.description;
   if (updates.isPublic !== undefined) payload.is_public = updates.isPublic;
-  await supabase.from('libraries').update(payload).eq('id', id);
+  const { error } = await supabase.from('libraries').update(payload).eq('id', id);
+  if (error) throw error;
 }
 
 export async function deleteLibrary(id: string): Promise<void> {
-  await supabase.from('libraries').delete().eq('id', id);
+  const { error } = await supabase.from('libraries').delete().eq('id', id);
+  if (error) throw error;
 }
 
 export async function getLibraryById(id: string): Promise<Library | null> {
@@ -252,7 +255,7 @@ export async function getBooksInLibrary(libraryId: string): Promise<LibraryBook[
 }
 
 export async function upsertBookInLibrary(libraryId: string, book: LibraryBookInput): Promise<void> {
-  await supabase.from('library_books').upsert({
+  const { error } = await supabase.from('library_books').upsert({
     library_id: libraryId, copy_id: book.copyId, record_id: book.recordId,
     title: book.title, authors: book.authors, sort_author: book.sortAuthor,
     isbn13: book.isbn13, publisher: book.publisher, published_year: book.publishedYear,
@@ -263,6 +266,36 @@ export async function upsertBookInLibrary(libraryId: string, book: LibraryBookIn
     main_class_code: book.mainClassCode, main_class_name: book.mainClassName,
     is_on_loan: book.isOnLoan, synced_at: new Date().toISOString(),
   }, { onConflict: 'library_id,copy_id' });
+  if (error) throw error;
+}
+
+// Shelf visitors can't see on-device cover files, so shelves get a public URL:
+// the cover we looked up, else the shared catalog's cover for the ISBN, else
+// Open Library's ISBN cover.
+export async function resolveShelfCover(coverImage: string | null, isbn13: string | null): Promise<string | null> {
+  if (coverImage && /^https?:\/\//i.test(coverImage)) return coverImage.replace(/^http:\/\//i, 'https://');
+  if (!isbn13) return null;
+  const community = await getCommunityBook(isbn13).catch(() => null);
+  return community?.coverUrl ?? `https://covers.openlibrary.org/b/isbn/${isbn13}-M.jpg`;
+}
+
+// Title, authors etc. belong to the book record, which every copy shares, so an
+// edit has to reach the shelf entries of all its copies, not just the one edited.
+export async function updateRecordOnShelves(recordId: string, fields: {
+  title: string; authors: string[]; sortAuthor: string; publisher: string | null;
+  publishedYear: number | null; pageCount: number | null; synopsis: string | null;
+  coverImage: string | null;
+}): Promise<void> {
+  // Signed out means no shelves to update
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
+  const { error } = await supabase.from('library_books').update({
+    title: fields.title, authors: fields.authors, sort_author: fields.sortAuthor,
+    publisher: fields.publisher, published_year: fields.publishedYear,
+    page_count: fields.pageCount, synopsis: fields.synopsis, cover_image: fields.coverImage,
+    synced_at: new Date().toISOString(),
+  }).eq('record_id', recordId);
+  if (error) throw error;
 }
 
 export async function syncBookToLibraries(libraryIds: string[], book: LibraryBookInput): Promise<void> {
@@ -270,11 +303,13 @@ export async function syncBookToLibraries(libraryIds: string[], book: LibraryBoo
 }
 
 export async function removeBookFromAllLibraries(copyId: string): Promise<void> {
-  await supabase.from('library_books').delete().eq('copy_id', copyId);
+  const { error } = await supabase.from('library_books').delete().eq('copy_id', copyId);
+  if (error) throw error;
 }
 
 export async function removeBookFromLibrary(libraryId: string, copyId: string): Promise<void> {
-  await supabase.from('library_books').delete().eq('library_id', libraryId).eq('copy_id', copyId);
+  const { error } = await supabase.from('library_books').delete().eq('library_id', libraryId).eq('copy_id', copyId);
+  if (error) throw error;
 }
 
 export async function getLibraryIdsForCopy(copyId: string): Promise<string[]> {
@@ -283,7 +318,11 @@ export async function getLibraryIdsForCopy(copyId: string): Promise<string[]> {
 }
 
 export async function updateBookLoanStatus(copyId: string, isOnLoan: boolean): Promise<void> {
-  await supabase.from('library_books').update({ is_on_loan: isOnLoan, synced_at: new Date().toISOString() }).eq('copy_id', copyId);
+  // Signed out means no shelves to update
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
+  const { error } = await supabase.from('library_books').update({ is_on_loan: isOnLoan, synced_at: new Date().toISOString() }).eq('copy_id', copyId);
+  if (error) throw error;
 }
 
 // ── Library Cards ──────────────────────────────────────────────────────────
@@ -319,7 +358,8 @@ export async function updateCardStatus(cardId: string, status: 'approved' | 'den
 }
 
 export async function deleteCard(cardId: string): Promise<void> {
-  await supabase.from('library_cards').delete().eq('id', cardId);
+  const { error } = await supabase.from('library_cards').delete().eq('id', cardId);
+  if (error) throw error;
 }
 
 export async function createInvite(libraryId: string): Promise<LibraryCard | null> {

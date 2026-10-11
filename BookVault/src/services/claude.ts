@@ -25,8 +25,23 @@ type SystemBlock = {
   cache_control?: { type: 'ephemeral'; ttl?: '1h' };
 };
 
+// Checks a key with the free model-list endpoint before it is saved, so a typo
+// is caught at once instead of every Claude button silently doing nothing.
+export async function testApiKey(key: string): Promise<'valid' | 'invalid' | 'unreachable'> {
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/models?limit=1', {
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    });
+    if (res.ok) return 'valid';
+    return res.status === 401 || res.status === 403 ? 'invalid' : 'unreachable';
+  } catch {
+    return 'unreachable';
+  }
+}
+
 // Calls the Anthropic messages API and forces Claude to respond via a named tool.
-// Returns the tool input object T, or null on any failure.
+// Returns the tool input object T. Throws an Error with a user-readable message
+// when there is no key or the request fails, so callers can say why.
 // Optional `system` blocks render before messages in the cache prefix — put
 // large stable context there (with cache_control) and volatile text in the
 // user message so repeat calls hit the prompt cache.
@@ -37,11 +52,12 @@ async function callClaudeWithTool<T>(
   inputSchema: object,
   system?: SystemBlock[],
 ): Promise<T | null> {
-  try {
-    const apiKey = await getApiKey();
-    if (!apiKey) return null;
+  const apiKey = await getApiKey();
+  if (!apiKey) throw new Error('Add your Anthropic API key in Settings to use Claude.');
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+  let res: Response;
+  try {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -57,16 +73,23 @@ async function callClaudeWithTool<T>(
         messages: [{ role: 'user', content: userPrompt }],
       }),
     });
-
-    if (!res.ok) return null;
-    const data = await res.json();
-    const toolUse = (data.content as any[])?.find(
-      (b) => b.type === 'tool_use' && b.name === toolName,
-    );
-    return (toolUse?.input as T) ?? null;
   } catch {
-    return null;
+    throw new Error('Could not reach Claude. Check your connection and try again.');
   }
+
+  if (res.status === 401 || res.status === 403) {
+    throw new Error('Your Anthropic API key was rejected. Check it in Settings.');
+  }
+  if (res.status === 429 || res.status === 529) {
+    throw new Error('Claude is busy right now. Try again in a minute.');
+  }
+  if (!res.ok) throw new Error(`Claude returned an error (${res.status}). Try again.`);
+
+  const data = await res.json();
+  const toolUse = (data.content as any[])?.find(
+    (b) => b.type === 'tool_use' && b.name === toolName,
+  );
+  return (toolUse?.input as T) ?? null;
 }
 
 interface BookData {
@@ -109,12 +132,13 @@ Based on your training knowledge, provide bibliographic information for the book
 Only fill fields you are confident about — use null for anything uncertain.
 Do not invent data for fields you do not recognise.`;
 
+  // A last-resort fallback: any failure just means "not found"
   const result = await callClaudeWithTool<BookData>(
     prompt.trim(),
     'submit_book_data',
     'Submit bibliographic data for the requested book. Use null for unknown fields.',
     BOOK_DATA_SCHEMA,
-  );
+  ).catch(() => null);
 
   if (!result || !result.title) return null;
 
@@ -284,41 +308,47 @@ ${book.deweyDecimal ? `Dewey Decimal: ${book.deweyDecimal}` : ''}`;
   };
 }
 
+// Fields Claude may fill from its training knowledge. Cover URLs and ratings are
+// deliberately excluded: it can only guess those, and a made-up URL or rating
+// looks exactly like a real one.
+const FILLABLE_FIELDS = {
+  title: { type: 'string' },
+  authors: { type: 'array', items: { type: 'string' } },
+  publisher: { type: ['string', 'null'] },
+  publishedYear: { type: ['integer', 'null'] },
+  pageCount: { type: ['integer', 'null'] },
+  synopsis: { type: ['string', 'null'] },
+  deweyDecimal: { type: ['string', 'null'] },
+} as const;
+
+type FillableField = keyof typeof FILLABLE_FIELDS;
+
+// Returns only the fields Claude actually filled (an empty object if none).
 export async function fillMissingFields(
   existing: Partial<BookLookupResult>,
-): Promise<Partial<BookLookupResult> | null> {
-  const missing = (Object.keys(existing) as Array<keyof BookLookupResult>).filter((k) => {
+  isbn?: string | null,
+): Promise<Partial<BookLookupResult>> {
+  const missing = (Object.keys(FILLABLE_FIELDS) as FillableField[]).filter((k) => {
     const v = existing[k];
-    return v === null || v === undefined || v === '';
+    return v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
   });
+  if (!missing.length) return {};
 
-  if (!missing.length) return null;
+  const known: Record<string, unknown> = {};
+  for (const k of Object.keys(FILLABLE_FIELDS) as FillableField[]) {
+    if (!missing.includes(k)) known[k] = existing[k];
+  }
+  if (isbn) known.isbn = isbn;
+  if (!Object.keys(known).length) return {};
 
   const prompt = `I have a book with this partial information:
-${JSON.stringify(existing, null, 2)}
+${JSON.stringify(known, null, 2)}
 
 Fill in only the following missing fields using your training knowledge: ${missing.join(', ')}.
 Use null for any field you cannot determine with confidence.`;
 
-  // Build a schema that only requests the missing fields
   const properties: Record<string, object> = {};
-  const FIELD_SCHEMAS: Record<string, object> = {
-    title: { type: 'string' },
-    authors: { type: 'array', items: { type: 'string' } },
-    publisher: { type: ['string', 'null'] },
-    publishedYear: { type: ['integer', 'null'] },
-    pageCount: { type: ['integer', 'null'] },
-    synopsis: { type: ['string', 'null'] },
-    coverUrl: { type: ['string', 'null'] },
-    deweyDecimal: { type: ['string', 'null'] },
-    communityRating: { type: ['number', 'null'] },
-    communityRatingCount: { type: ['integer', 'null'] },
-  };
-  for (const field of missing) {
-    if (FIELD_SCHEMAS[field]) properties[field] = FIELD_SCHEMAS[field];
-  }
-
-  if (!Object.keys(properties).length) return null;
+  for (const field of missing) properties[field] = FILLABLE_FIELDS[field];
 
   const result = await callClaudeWithTool<Partial<BookLookupResult>>(
     prompt,
@@ -327,5 +357,11 @@ Use null for any field you cannot determine with confidence.`;
     { type: 'object', properties },
   );
 
-  return result;
+  const filled: Partial<BookLookupResult> = {};
+  for (const field of missing) {
+    const v = result?.[field];
+    if (v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0)) continue;
+    (filled as any)[field] = v;
+  }
+  return filled;
 }

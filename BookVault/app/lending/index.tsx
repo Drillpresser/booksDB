@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, Alert,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Image,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fonts, spacing, radius } from '../../src/theme';
 import { getActiveLoans, getAllReturnedLoans, returnLoan } from '../../src/database/queries/loans';
 import { updateBookLoanStatus } from '../../src/services/library';
+import { alertShelfSyncFailed } from '../../src/components/shelfAlerts';
 import type { LoanWithDetails } from '../../src/types';
 import { daysLate, daysSince, daysUntilDue, formatDate } from '../../src/lib/dates';
 
@@ -37,7 +38,15 @@ function returnedPill(loan: LoanWithDetails): { label: string; bg: string; color
   return { label: 'On time', bg: '#EAF0DA', color: colors.accentDark };
 }
 
-function SpineCover({ size = 48 }: { size?: number }) {
+function SpineCover({ size = 48, uri }: { size?: number; uri?: string | null }) {
+  if (uri) {
+    return (
+      <Image
+        source={{ uri }}
+        style={{ width: size * 0.67, height: size, borderRadius: 4, borderWidth: 1, borderColor: colors.border, flexShrink: 0 }}
+      />
+    );
+  }
   return (
     <View style={{ width: size * 0.67, height: size, borderRadius: 4, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', flexShrink: 0 }}>
       <View style={{ position: 'absolute', left: 5, top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(255,255,255,0.4)' }} />
@@ -68,7 +77,7 @@ export default function LendingScreen() {
           text: 'Returned',
           onPress: () => {
             returnLoan(loan.id, new Date().toISOString());
-            updateBookLoanStatus(loan.copyId, false).catch(() => {});
+            updateBookLoanStatus(loan.copyId, false).catch(alertShelfSyncFailed);
             setLoans(getActiveLoans());
             setHistory(getAllReturnedLoans());
           },
@@ -135,7 +144,7 @@ export default function LendingScreen() {
                 onPress={() => router.push(`/library/${loan.copyId}`)}
                 activeOpacity={0.7}
               >
-                <SpineCover size={60} />
+                <SpineCover size={60} uri={loan.bookRecord.coverImage} />
                 <View style={styles.loanInfo}>
                   <Text style={styles.loanTitle} numberOfLines={1}>{loan.bookRecord.title}</Text>
                   <View style={styles.patronRow}>
@@ -195,7 +204,7 @@ export default function LendingScreen() {
                     onPress={() => router.push(`/library/${loan.copyId}`)}
                     activeOpacity={0.7}
                   >
-                    <SpineCover size={54} />
+                    <SpineCover size={54} uri={loan.bookRecord.coverImage} />
                     <View style={styles.loanInfo}>
                       <Text style={styles.loanTitle} numberOfLines={1}>{loan.bookRecord.title}</Text>
                       <View style={styles.patronRow}>
