@@ -4,6 +4,10 @@ Notable changes to BookHoarder. Versions correspond to iOS build numbers on Test
 
 ## [Unreleased]
 
+## [Builds 21–25] — 2026-10-09 / 2026-10-12 (TestFlight)
+
+Build 25 is the App Store release candidate. Builds 21 and 24 were interim builds with part of these changes; 22–23 were skipped.
+
 ### Added
 - **Privacy Policy and Help & Support links** in Settings → About. They open the new pages in the repo's `docs/` folder (served by GitHub Pages), which replace the unfilled `privacy-policy.html` template. App Store Connect needs the privacy and support URLs, and the policy must also be reachable in-app.
 
