@@ -56,15 +56,6 @@ export function deleteContact(id: string) {
   db.runSync('DELETE FROM contacts WHERE id = ?', [id]);
 }
 
-export function getActiveLoansCountForContact(contactId: string): number {
-  const db = getDB();
-  const row = db.getFirstSync(
-    'SELECT COUNT(*) as count FROM loans WHERE contact_id = ? AND date_returned IS NULL',
-    [contactId]
-  ) as any;
-  return row?.count ?? 0;
-}
-
 export interface ContactLoanStatus {
   activeCount: number;
   hasOverdue: boolean;
