@@ -51,24 +51,6 @@ export function getDivisionsBySection(sectionId: string): Division[] {
   return rows.map(rowToDivision);
 }
 
-export function getMainClassById(id: string): MainClass | null {
-  const db = getDB();
-  const row = db.getFirstSync('SELECT * FROM main_classes WHERE id = ?', [id]);
-  return row ? rowToMainClass(row) : null;
-}
-
-export function getSectionById(id: string): Section | null {
-  const db = getDB();
-  const row = db.getFirstSync('SELECT * FROM sections WHERE id = ?', [id]);
-  return row ? rowToSection(row) : null;
-}
-
-export function getDivisionById(id: string): Division | null {
-  const db = getDB();
-  const row = db.getFirstSync('SELECT * FROM divisions WHERE id = ?', [id]);
-  return row ? rowToDivision(row) : null;
-}
-
 export function createMainClass(code: string, name: string): MainClass {
   const db = getDB();
   const id = generateId();

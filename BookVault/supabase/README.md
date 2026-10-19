@@ -21,24 +21,11 @@ Files are applied in filename (timestamp) order:
 | 6 | `20261006000000_reharden_shelf_policies.sql` | re-applies the July shelf hardening (owner-only card/request updates, no invite-row access) that files 1–2 reverted on their first CI deploy |
 | 7 | `20261006000100_revoke_exposed_invites.sql` | deletes unclaimed invites issued before the re-hardening (their tokens were publicly readable) |
 | 8 | `20261006000200_capture_invite_rpcs.sql` | `get_invite` / `claim_invite` RPCs, realtime publication + replica identity for cards/requests (captured from production) |
+| 9 | `20261007000000_report_and_block.sql` | `user_blocks`, `content_reports`, `report_content()` RPC, block trigger and restrictive RLS (see [`tools/MODERATION.md`](tools/MODERATION.md)) |
 
 All migrations are **idempotent** (tables use `IF NOT EXISTS`; policies are
 dropped before being recreated; views use `CREATE OR REPLACE`), so they are
 safe to apply to a database that was previously provisioned by hand.
-
-### One-time setup on an existing project
-
-Because the production database already contains these objects (they were
-applied manually before this folder existed), the first `db push` will run all
-four migrations. Idempotency makes that safe — it re-declares the same objects.
-
-Alternatively, baseline the history so they are marked applied without running:
-
-```bash
-supabase link --project-ref <ref>
-supabase migration repair --status applied \
-  20240901000000 20240901000100 20250801000000 20250801000100
-```
 
 ### CI secrets
 

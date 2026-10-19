@@ -160,15 +160,6 @@ export function getAllCopies(sortBy: CopySortMode = 'classification'): BookCopyW
   return rows.map(rowToDetail);
 }
 
-export function getCopiesByDivision(divisionId: string): BookCopyWithDetails[] {
-  const db = getDB();
-  const rows = db.getAllSync(
-    `${COPY_DETAIL_QUERY} WHERE bc.division_id = ? ORDER BY br.sort_author, br.title`,
-    [divisionId]
-  ) as any[];
-  return rows.map(rowToDetail);
-}
-
 export function getCopyById(copyId: string): BookCopyWithDetails | null {
   const db = getDB();
   const row = db.getFirstSync(`${COPY_DETAIL_QUERY} WHERE bc.id = ?`, [copyId]) as any;

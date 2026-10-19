@@ -117,13 +117,3 @@ export function getAllReturnedLoans(): LoanWithDetails[] {
   ) as any[];
   return rows.map(rowToDetail);
 }
-
-export function getOverdueCount(): number {
-  const db = getDB();
-  const rows = db.getAllSync(
-    `SELECT date_lent, expected_return FROM loans WHERE date_returned IS NULL`
-  ) as any[];
-  return rows.filter((r) =>
-    isLoanOverdue({ dateLent: r.date_lent, expectedReturn: r.expected_return, dateReturned: null })
-  ).length;
-}
