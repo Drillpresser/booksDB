@@ -4,6 +4,10 @@ Notable changes to BookHoarder. Versions correspond to iOS build numbers on Test
 
 ## [Unreleased]
 
+## [Builds 21–25] — 2026-10-09 / 2026-10-12 (TestFlight)
+
+Build 25 is the App Store release candidate. Builds 21 and 24 were interim builds with part of these changes; 22–23 were skipped.
+
 ### Added
 - **Privacy Policy and Help & Support links** in Settings → About. They open the new pages in the repo's `docs/` folder (served by GitHub Pages), which replace the unfilled `privacy-policy.html` template. App Store Connect needs the privacy and support URLs, and the policy must also be reachable in-app.
 
@@ -38,6 +42,9 @@ Notable changes to BookHoarder. Versions correspond to iOS build numbers on Test
 - **Editing a book** now updates the shelf entries of every copy of that book, not just the one you edited.
 - **Deleting the last copy of a book** now also deletes its saved cover image file.
 - Book and patron updates now run as a single SQL statement instead of one per field.
+
+### Security
+- **Google Books requests send the app's bundle ID** (`X-Ios-Bundle-Identifier`), so the API key can be restricted to BookHoarder in Google Cloud. Builds without this header lose Google Books results once the restriction is turned on (Open Library still works).
 
 ### Security (Supabase)
 - **Re-closed shelf privilege-escalation holes** (`20261006000000_reharden_shelf_policies.sql`) — the repo's original shelf migrations still held the pre-July policies, and CI's first `supabase db push` (2026-08-08) re-created them next to the hardened ones. From then until this fix, unclaimed invite tokens were readable (even signed out), any signed-in user could claim an invite card without its token, and applicants/requesters could approve their own cards and requests. The migration drops those policies and restores owner-only updates with no direct access to invite rows (invites go through `get_invite` / `claim_invite`). Verified against the vulnerable state: 6 exploits reproduced before, all blocked after, owner/cardholder flows unaffected.

@@ -21,7 +21,6 @@
         "UIDesignRequiresCompatibility": true,
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "16",
       "usesAppleSignIn": true
     },
     "android": {

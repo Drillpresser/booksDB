@@ -4,13 +4,20 @@ import { normalizeIsbn } from '../lib/isbn';
 import type { BookLookupResult } from '../types';
 
 const GOOGLE_BOOKS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY ?? '';
+// The API key is restricted to this iOS bundle ID in Google Cloud. Google's own
+// SDKs send this header automatically; plain fetch has to send it itself.
+const GOOGLE_HEADERS = { 'X-Ios-Bundle-Identifier': 'com.bookvault.app' };
 const NON_LATIN = /[^ -ɏ]/;
 
-async function fetchWithTimeout(url: string, ms = 6000): Promise<Response> {
+async function fetchWithTimeout(
+  url: string,
+  ms = 6000,
+  headers?: Record<string, string>,
+): Promise<Response> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
   try {
-    return await fetch(url, { signal: ctrl.signal });
+    return await fetch(url, { signal: ctrl.signal, headers });
   } finally {
     clearTimeout(timer);
   }
@@ -220,6 +227,8 @@ async function lookupGoogleBooks(isbn: string): Promise<ResultWithLang | null> {
     // No langRestrict for ISBN lookup — we detect language from volumeInfo.language instead.
     const res = await fetchWithTimeout(
       `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}${key}`,
+      undefined,
+      GOOGLE_HEADERS,
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -337,6 +346,8 @@ async function searchGoogleBooks(query: string): Promise<BookLookupResult[]> {
     const q = encodeURIComponent(query.trim());
     const res = await fetchWithTimeout(
       `https://www.googleapis.com/books/v1/volumes?q=${q}&langRestrict=en&maxResults=20${key}`,
+      undefined,
+      GOOGLE_HEADERS,
     );
     if (!res.ok) return [];
     const data = await res.json();
